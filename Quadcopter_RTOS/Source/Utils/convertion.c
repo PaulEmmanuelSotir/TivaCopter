@@ -1,3 +1,8 @@
+/*
+ * conversion.c
+ *
+ *  Created on: 31 août 2014
+ */
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -5,7 +10,21 @@
 
 #include "conversion.h"
 
-uint32_t itoa2(int value, char buff[], bool AddEndingZero)
+//------------------------------------------
+// itoa:
+// Int to char* conversion function.
+//------------------------------------------
+uint32_t itoa(int32_t value, char* buff)
+{
+	return itoa2(value, buff, true);
+}
+
+//------------------------------------------
+// itoa2:
+// Int to char* conversion function with
+// optional ending '\0'.
+//------------------------------------------
+uint32_t itoa2(int32_t value, char* buff, bool AddEndingZero)
 {
     static char const digit[] = "0123456789";
     char* It = buff;
@@ -47,30 +66,24 @@ uint32_t itoa2(int value, char buff[], bool AddEndingZero)
     return length;
 }
 
-uint32_t itoa(int value, char buff[])
+//------------------------------------------
+// ftoa:
+// Float to char* conversion function.
+//------------------------------------------
+uint32_t ftoa(float value, char* buff, uint8_t DecimalCount)
 {
-	return itoa2(value, buff, true);
+	return ftoa2(value, buff, DecimalCount, true);
 }
 
-void Decuitoa(uint32_t value, char buff[], uint32_t digitCount, bool AddEndingZero)
-{
-	static char const digit[] = "0123456789";
-	char* It = buff + digitCount;
-
-	if(AddEndingZero)
-		*It = '\0';
-
-	// Move back, inserting digits as you go
-	while(It > buff)
-	{
-		*--It = digit[value % 10];
-		value /= 10;
-	}
-}
-
-uint32_t ftoa2(float value, char buff[], uint8_t DecimalCount, bool AddEndingZero)
+//------------------------------------------
+// ftoa2:
+// Float to char* conversion function with
+// optional ending '\0'.
+//------------------------------------------
+uint32_t ftoa2(float value, char* buff, uint8_t DecimalCount, bool AddEndingZero)
 {
 	uint32_t length = 0;
+	static char const digit[] = "0123456789";
 
 	if(value < 0)
 	{
@@ -97,15 +110,23 @@ uint32_t ftoa2(float value, char buff[], uint8_t DecimalCount, bool AddEndingZer
 
 		if(decValue != 0)
 		{
-			buff[length++] = '.';
-			Decuitoa(decValue, buff + length, DecimalCount, AddEndingZero);
-			length += DecimalCount;
+			buff += length;
+			*(buff++) = '.';
+
+			char* It = buff + DecimalCount;
+
+			if(AddEndingZero)
+				*It = '\0';
+
+			// Move back, inserting decimal part digits as you go
+			while(It > buff)
+			{
+				*--It = digit[decValue % 10];
+				decValue /= 10;
+			}
+
+			length += DecimalCount + 1;
 		}
 	}
 	return length;
-}
-
-uint32_t ftoa(float value, char buff[], uint8_t DecimalCount)
-{
-	return ftoa2(value, buff, DecimalCount, true);
 }
