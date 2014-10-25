@@ -7,8 +7,8 @@ Folder structure
 --------
 
 * Quadcopter_RTOS : Code composer studio project
-* MagMaster : Magnetomet calibration utilities from Yury Matselenak ([DIY drone post](http://diydrones.com/profiles/blog/show?id=705844%3ABlogPost%3A1676387))
-* Hardware documentation : documentation about several quadcopter hardware components
+* MagMaster : Magnetometer calibration utilities from Yury Matselenak ([DIY drone post](http://diydrones.com/profiles/blog/show?id=705844%3ABlogPost%3A1676387))
+* Hardware documentation : Documentation about several quadcopter hardware components
 * QuadcopterPinMap.pin : Pin map file used with PinMux utility from Texas Intruments to determine launchpad pin map.
 * GNSS_Viewer.exe : Executable used to visualize GPS data.
 
@@ -52,7 +52,7 @@ i2cregr 104 59 6
 I²C Transaction API
 --------
 
-I²C Transaction API is an asynchronous inter integrated circuit C application programming interface. I²C Transaction API provides the following features :
+I²C Transaction API is an asynchronous Inter Integrated Circuit C Application Programming Interface! I²C Transaction API provides the following features :
 * Based on Tivaware I²C driver library
 * Asynchronous operations
 * RTOS-compatible
