@@ -48,6 +48,8 @@ void JSON_list_sources_cmd(int argc, char *argv[]);
 void JSON_enable_cmd(int argc, char *argv[]);
 void JSON_disable_cmd(int argc, char *argv[]);
 void JSON_start_cmd(int argc, char *argv[]);
+void JSON_enable_programatic_access_cmd(int argc, char *argv[]);
+void JSON_disable_programatic_access_cmd(int argc, char *argv[]);
 
 //--------------------------------------------
 // Suscribe data source:
