@@ -180,10 +180,10 @@ void PIDTask(void)
 		if(QuadControl.motorsOn)
 		{
 			// Convert euler angles to motors command
-			Motors[0].power = - YawPID.out + PitchPID.out - RollPID.out + QuadControl.throttle;
-			Motors[1].power =   YawPID.out - PitchPID.out - RollPID.out + QuadControl.throttle;
-			Motors[2].power = - YawPID.out - PitchPID.out + RollPID.out + QuadControl.throttle;
-			Motors[3].power =   YawPID.out + PitchPID.out + RollPID.out + QuadControl.throttle;
+			Motors[0].power = - YawPID.out + PitchPID.out + RollPID.out + QuadControl.throttle;
+			Motors[1].power =   YawPID.out - PitchPID.out + RollPID.out + QuadControl.throttle;
+			Motors[2].power = - YawPID.out - PitchPID.out - RollPID.out + QuadControl.throttle;
+			Motors[3].power =   YawPID.out + PitchPID.out - RollPID.out + QuadControl.throttle;
 
 			// Limit output to its range (saturation)
 			uint32_t i;

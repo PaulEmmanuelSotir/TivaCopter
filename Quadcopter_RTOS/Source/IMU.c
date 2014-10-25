@@ -391,9 +391,9 @@ void IMUProcessingTask(void)
 			q3 *= recipNorm;
 
 			// Convert quaternion to euler angles
-			IMU.roll 	=	atan2(2*q1*q0 - 2*q2*q3, 1 - 2*pow(q1,2) - 2*pow(q2,2));
-			IMU.pitch 	= 	asin(2*(q0*q2 + q3*q1));
-			IMU.yaw 	=	atan2(2*(q0*q3 - q1*q2), 1 - 2*(pow(q2,2) - pow(q3,2)));
+			IMU.yaw 	=	atan2(2*(q0*q3 + q1*q2), 1 - 2*(pow(q2,2) + pow(q3,2)));
+			IMU.pitch 	= 	asin(2*(q0*q2 - q3*q1));
+			IMU.roll 	=	atan2(2*(q0*q1 + q2*q3), 1 - 2*(pow(q1,2) + pow(q2,2)));
 
 		    // Return the quaternion values.
 			IMU.q[0] = q0;
