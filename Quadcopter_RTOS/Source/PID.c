@@ -131,7 +131,7 @@ void PIDTask(void)
 																					"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
 
 	// Suscribe a bluetooth datasource to send periodically Radio's data
-	JSONDataSource* Radiods = SuscribePeriodicJSONDataSource("Radio", (const char*[]) {	"in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
+	JSONDataSource* Radiods = SuscribePeriodicJSONDataSource("radio", (const char*[]) {	"in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
 
 	while(1)
 	{
