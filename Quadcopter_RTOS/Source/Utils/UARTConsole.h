@@ -99,9 +99,9 @@ typedef struct
 	char *Argv[CMDLINE_MAX_ARGS + 1];
 
 	// This flag controls whether or not we are echoing characters back to the transmitter.
-	bool CmdLineInterfaceDisabled;
+	volatile bool CmdLineInterfaceDisabled;
 	// This flag indicates wether if current command execution abort is requested by user.
-	bool IsAbortRequested;
+	volatile bool IsAbortRequested;
 } UARTConsole;
 
 //---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
-bool SubscribeCmd(UARTConsole* console, char* name, CmdApp cmdApp, char* cmdHelp);
+bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp cmdApp, const char* cmdHelp);
 
 //---------------------------------------------------------------------------
 // Check argument count:
@@ -139,7 +139,7 @@ bool checkArgCount(UARTConsole* console, int argc, int expected);
 // Indicates wether if current command execution need to be aborted.
 // User can abort a command by typing 'CTRL+C' in the command line interface.
 //----------------------------------------------------------------------------
-bool IsAbortRequested(UARTConsole* console);
+bool IsAbortRequested(const UARTConsole* console);
 
 //----------------------------------------------------------------------------
 // Disable command line interface:

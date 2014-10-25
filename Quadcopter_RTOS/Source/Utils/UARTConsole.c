@@ -117,7 +117,7 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
-bool SubscribeCmd(UARTConsole* console, char* name, CmdApp cmdApp, char* cmdHelp)
+bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp cmdApp, const char* cmdHelp)
 {
 	// If there is no more available space in dynamic command array, we allocate more memory.
 	if (console->CmdTable.used == console->CmdTable.size)
@@ -292,7 +292,7 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 				}
 			}
 			// else, if CTRL+C (ETX=0x03) character have been sent, we raise abrot requested flag
-			else if(cChar == 0x03)
+			else if(cChar == '\x03')
 			{
 				console->IsAbortRequested = true;
 				continue;
@@ -324,7 +324,7 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 // Indicates wether if current command execution need to be aborted.
 // User can abort a command by typing 'CTRL+C' in the command line interface.
 //----------------------------------------------------------------------------
-bool IsAbortRequested(UARTConsole* console)
+bool IsAbortRequested(const UARTConsole* console)
 {
 	return console->IsAbortRequested;
 }
@@ -341,11 +341,8 @@ bool IsAbortRequested(UARTConsole* console)
 //---------------------------------------------------------------------------
 static bool IsBufferFull(volatile uint32_t *pui32Read, volatile uint32_t *pui32Write, uint32_t ui32Size)
 {
-	uint32_t ui32Write;
-	uint32_t ui32Read;
-
-	ui32Write = *pui32Write;
-	ui32Read = *pui32Read;
+	const uint32_t ui32Write = *pui32Write;
+	const uint32_t ui32Read = *pui32Read;
 
 	return((((ui32Write + 1) % ui32Size) == ui32Read) ? true : false);
 }
@@ -361,11 +358,8 @@ static bool IsBufferFull(volatile uint32_t *pui32Read, volatile uint32_t *pui32W
 //---------------------------------------------------------------------------
 static bool IsBufferEmpty(volatile uint32_t *pui32Read, volatile uint32_t *pui32Write)
 {
-	uint32_t ui32Write;
-	uint32_t ui32Read;
-
-	ui32Write = *pui32Write;
-	ui32Read = *pui32Read;
+	const uint32_t ui32Write = *pui32Write;
+	const uint32_t ui32Read = *pui32Read;
 
 	return((ui32Write == ui32Read) ? true : false);
 }
@@ -382,11 +376,8 @@ static bool IsBufferEmpty(volatile uint32_t *pui32Read, volatile uint32_t *pui32
 //---------------------------------------------------------------------------
 static uint32_t GetBufferCount(volatile uint32_t *pui32Read, volatile uint32_t *pui32Write, uint32_t ui32Size)
 {
-	uint32_t ui32Write;
-	uint32_t ui32Read;
-
-	ui32Write = *pui32Write;
-	ui32Read = *pui32Read;
+	const uint32_t ui32Write = *pui32Write;
+	const uint32_t ui32Read = *pui32Read;
 
 	return((ui32Write >= ui32Read) ? (ui32Write - ui32Read) : (ui32Size - (ui32Read - ui32Write)));
 }
