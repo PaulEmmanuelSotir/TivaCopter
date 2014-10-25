@@ -14,6 +14,7 @@
 #include <ti/sysbios/BIOS.h> 				//mandatory - if you call APIs like BIOS_start()
 #include <xdc/runtime/Log.h>				//needed for any Log_info() call
 #include <xdc/cfg/global.h> 				//header file for statically defined objects/handles
+#include <ti/sysbios/gates/GateMutexPri.h>
 
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
@@ -51,6 +52,27 @@ InertialMeasurementUnit IMU = {	.magn = &Magn, .accel = &Accel, . gyro = &Gyro,
 								.q = {1.0, 0.0, 0.0, 0.0},
 								.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
 								.IMUStrValues = {"1", "0", "0", "0"}};
+
+//----------------------------------------
+// Lock function used by I2C transaction
+// API to protect its ressources from
+// multithread accesses.
+//----------------------------------------
+intptr_t I2CTransactionsLock(void)
+{
+	intptr_t lock = GateMutexPri_enter(I2CTransactionsGateMutexPri);
+	return lock;
+}
+
+//----------------------------------------
+// Unlock function used by I2C transaction
+// API to protect its ressources from
+// multithread accesses.
+//----------------------------------------
+void I2CTransactionUnlock(intptr_t lock)
+{
+	GateMutexPri_leave(I2CTransactionsGateMutexPri, lock);
+}
 
 //----------------------------------------
 // I²C0 Hardware Interrupt

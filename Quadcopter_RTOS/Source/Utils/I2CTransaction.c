@@ -24,24 +24,27 @@ const static I2CTransaction DEFAULT_I2C_TRANSACTION = { I2C0_BASE, TRANSAC_DIR_R
 // > Do not even read 'LastTransac' and 'AllocatedTransactionNumber'
 // > TRANSACTION_SIZE is approx. 36 bytes.
 //------------------------------------------------------------------------------------
-static I2CTransaction*      CurrentTransac 				= NULL;
-static I2CTransaction*      LastTransac 				= NULL;
-static uint32_t             AllocatedTransactionNumber	= 0;
-const static uint32_t       TRANSACTION_SIZE 			= sizeof(struct I2CTransaction);
+static I2CTransaction*	CurrentTransac 				= NULL;
+static I2CTransaction* 	LastTransac 				= NULL;
+static uint32_t			AllocatedTransactionNumber	= 0;
+static const uint32_t	TRANSACTION_SIZE 			= sizeof(struct I2CTransaction);
 
-uint32_t I2CStateMachineDelayed_Flag 					= 0;
-uint32_t I2CTransactionCreation_Flag 					= 0;
+//-------------------------------------------
+// User defined lock and unlock functions
+// protecting I2C transactions creation from
+// beeing corrupted by other threads accesses.
+// For example, users using TI-RTOS could
+// implement these function using GateMutexPri
+//--------------------------------------------
+extern intptr_t I2CTransactionsLock(void);
+extern void I2CTransactionUnlock(intptr_t lock);
 
 //------------------------------------------
 // I2C interrupt state machine
 //------------------------------------------
 void I2CIntStateMachine()
 {
-	if(I2CTransactionCreation_Flag)
-	{
-		I2CStateMachineDelayed_Flag = 1;
-		return;
-	}
+	intptr_t lock = I2CTransactionsLock();
 
 	if(CurrentTransac != NULL)
 	{
@@ -211,6 +214,8 @@ void I2CIntStateMachine()
 	{
 		// TODO: error ??
 	}
+
+	I2CTransactionUnlock(lock);
 }
 
 //------------------------------------------
@@ -289,10 +294,7 @@ static void BeginReadTransaction(I2CTransaction* transaction)
 //------------------------------------------
 void Async_I2CWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint8_t *data, uint32_t dataCount, I2CTransacCallback callback)
 {
-	// Block until all other thead's I2C transaction creation are done
-	while(I2CTransactionCreation_Flag);
-
-	I2CTransactionCreation_Flag = 1;
+	intptr_t lock = I2CTransactionsLock();
 
 	// Allocate a new transaction
 	I2CTransaction *newTransac = AddTransac();
@@ -307,12 +309,7 @@ void Async_I2CWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint8_t *data, uin
 	newTransac->RegisterAddress = NULL;
 	newTransac->Callback = callback;
 
-	I2CTransactionCreation_Flag = 0;
-	if(I2CStateMachineDelayed_Flag)
-	{
-		I2CStateMachineDelayed_Flag = false;
-		I2CIntStateMachine();
-	}
+	I2CTransactionUnlock(lock);
 
 	// If there isn't any other executing transactions we begin this transaction immediatly.
 	if(newTransac == CurrentTransac)
@@ -324,10 +321,7 @@ void Async_I2CWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint8_t *data, uin
 //------------------------------------------
 void Async_I2CRegWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registerAddress, uint8_t *data, uint32_t dataCount, I2CTransacCallback callback)
 {
-	// Block until all other thead's I2C transaction creation are done
-	while(I2CTransactionCreation_Flag);
-
-	I2CTransactionCreation_Flag = 1;
+	intptr_t lock = I2CTransactionsLock();
 
 	// Allocate a new transaction
 	I2CTransaction *newTransac = AddTransac();
@@ -341,12 +335,7 @@ void Async_I2CRegWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t regist
 	newTransac->RegisterAddress = registerAddress;
 	newTransac->Callback = callback;
 
-	I2CTransactionCreation_Flag = 0;
-	if(I2CStateMachineDelayed_Flag)
-	{
-		I2CStateMachineDelayed_Flag = false;
-		I2CIntStateMachine();
-	}
+	I2CTransactionUnlock(lock);
 
 	// If there isn't any other executing transactions we begin this transaction immediatly.
 	if(newTransac == CurrentTransac)
@@ -358,10 +347,7 @@ void Async_I2CRegWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t regist
 //------------------------------------------
 void Async_I2CRegRead(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registerAddress, uint8_t *data, uint32_t dataCount, I2CTransacCallback callback)
 {
-	// Block until all other thead's I2C transaction creation are done
-	while(I2CTransactionCreation_Flag);
-
-	I2CTransactionCreation_Flag = 1;
+	intptr_t lock = I2CTransactionsLock();
 
 	// Allocate a new transaction
 	I2CTransaction *newTransac = AddTransac();
@@ -374,12 +360,7 @@ void Async_I2CRegRead(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registe
 	newTransac->RegisterAddress = registerAddress;
 	newTransac->Callback = callback;
 
-	I2CTransactionCreation_Flag = 0;
-	if(I2CStateMachineDelayed_Flag)
-	{
-		I2CStateMachineDelayed_Flag = false;
-		I2CIntStateMachine();
-	}
+	I2CTransactionUnlock(lock);
 
 	// If there isn't any other executing transactions we begin this transaction immediatly.
 	if(newTransac == CurrentTransac)
@@ -393,10 +374,7 @@ void Async_I2CRegRead(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registe
 //-----------------------------------------------
 void Async_I2CRegReadModifyWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registerAddress, uint8_t *data, uint8_t mask, I2CTransacCallback callback)
 {
-	// Block until all other thead's I2C transaction creation are done
-	while(I2CTransactionCreation_Flag);
-
-	I2CTransactionCreation_Flag = 1;
+	intptr_t lock = I2CTransactionsLock();
 
 	// Allocate a new transaction
 	I2CTransaction *newTransac = AddTransac();
@@ -411,12 +389,7 @@ void Async_I2CRegReadModifyWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint3
 	newTransac->RegisterAddress = registerAddress;
 	newTransac->Callback = callback;
 
-	I2CTransactionCreation_Flag = 0;
-	if(I2CStateMachineDelayed_Flag)
-	{
-		I2CStateMachineDelayed_Flag = false;
-		I2CIntStateMachine();
-	}
+	I2CTransactionUnlock(lock);
 
 	// If there isn't any other executing transactions we begin this transaction immediatly.
 	if(newTransac == CurrentTransac)
