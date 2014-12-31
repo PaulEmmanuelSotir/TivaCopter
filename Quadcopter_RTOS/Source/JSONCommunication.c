@@ -275,6 +275,10 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 					}
 
 					UARTwrite(&Console, JSONProgrammaticAccesMode ? " }" : "\n}", 2);
+
+					// Send data now to avoid data losses due to limited buffer size
+					UARTFlushTx(&Console, false);
+
 					return true;
 				}
 				// Datasource disabled (not an error)
@@ -348,6 +352,9 @@ void PeriodicJSONDataSendingTask(void)
 					}
 
 					UARTwrite(&Console, JSONProgrammaticAccesMode ? " }" : "\n}", 2);
+
+					// Send data now to avoid data losses due to limited buffer size
+					UARTFlushTx(&Console, false);
 
 					ds->sendNowFlag = false;
 				}
