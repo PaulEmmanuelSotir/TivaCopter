@@ -8,7 +8,45 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "math.h"
+
 #include "conversion.h"
+
+static uint32_t uitoaReal(int32_t value, char* buff, bool AddEndingZero)
+{
+	static char const digit[] = "0123456789";
+	char* It = buff;
+
+	// Move to where representation ends
+	if(value == 0)
+		It++;
+	else
+	{
+		uint32_t shifter;
+		for(shifter = value; shifter != 0; shifter /= 10)
+			It++;
+	}
+
+	// Get final string length
+	uint32_t length = It - buff;
+
+	if(AddEndingZero)
+		*It = '\0';
+
+	// Move back, inserting digits as you go
+	if(value == 0)
+		*--It = '0';
+	else
+	{
+		while(value)
+		{
+			*--It = digit[value % 10];
+			value /= 10;
+		}
+	}
+
+	return length;
+}
 
 //------------------------------------------
 // itoa:
@@ -26,44 +64,31 @@ uint32_t itoa(int32_t value, char* buff)
 //------------------------------------------
 uint32_t itoa2(int32_t value, char* buff, bool AddEndingZero)
 {
-    static char const digit[] = "0123456789";
-    char* It = buff;
+	if(isnan(value))
+	{
+		buff[0] = 'N';
+		buff[1] = 'a';
+		buff[2] = 'N';
+		return 3;
+	}
+	else if(isinf(value))
+	{
+		buff[0] = value < 0 ? '-' : '+';
+		buff[1] = 'i';
+		buff[2] = 'n';
+		buff[3] = 'f';
+		return 4;
+	}
 
-    if(value < 0)
-    {
-        *It++ = '-';
-        value  *= -1;
-    }
+	if(value < 0)
+	{
+		*buff++ = '-';
+		value  *= -1;
 
-    // Move to where representation ends
-    if(value == 0)
-    	It++;
-    else
-    {
-		uint32_t shifter;
-		for(shifter = value; shifter != 0; shifter /= 10)
-			It++;
-    }
+		return uitoaReal(value, buff, AddEndingZero) + 1;
+	}
 
-    // Get final string length
-    uint32_t length = It - buff;
-
-    if(AddEndingZero)
-    	*It = '\0';
-
-    // Move back, inserting digits as you go
-    if(value == 0)
-    	*--It = '0';
-    else
-    {
-		while(value)
-		{
-			*--It = digit[value % 10];
-			value /= 10;
-		}
-    }
-
-    return length;
+	return uitoaReal(value, buff, AddEndingZero);
 }
 
 //------------------------------------------
@@ -85,6 +110,22 @@ uint32_t ftoa2(float value, char* buff, uint8_t DecimalCount, bool AddEndingZero
 	uint32_t length = 0;
 	static char const digit[] = "0123456789";
 
+	if(isnan(value))
+	{
+		buff[0] = 'N';
+		buff[1] = 'a';
+		buff[2] = 'N';
+		return 3;
+	}
+	else if(isinf(value))
+	{
+		buff[0] = value < 0 ? '-' : '+';
+		buff[1] = 'i';
+		buff[2] = 'n';
+		buff[3] = 'f';
+		return 4;
+	}
+
 	if(value < 0)
 	{
 		buff[length++] = '-';
@@ -97,7 +138,7 @@ uint32_t ftoa2(float value, char* buff, uint8_t DecimalCount, bool AddEndingZero
 	else
 		intValue = (uint32_t)(value + 0.5);
 
-	length += itoa2(intValue, buff + length, false);
+	length += uitoaReal(intValue, buff + length, false);
 
 	if(DecimalCount != 0)
 	{
