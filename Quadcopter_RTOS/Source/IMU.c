@@ -25,6 +25,7 @@
 #include "Utils/conversion.h"
 #include "Utils/I2CTransaction.h"
 #include "Utils/UARTConsole.h"
+#include "Utils/quaternions.h"
 #include "JSONCommunication.h"
 #include "PinMap.h"
 #include "IMU.h"
@@ -50,8 +51,9 @@ static Gyroscope Gyro = {.range = _250dps, .xOffset = 0.0f, .yOffset = 0.0f, .zO
 static Accelerometer Accel = {.range = _4g};
 InertialMeasurementUnit IMU = {	.magn = &Magn, .accel = &Accel, . gyro = &Gyro,
 								.q = {1.0, 0.0, 0.0, 0.0},
+								.pos = {0.0, 0.0, 0.0},
 								.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
-								.IMUStrValues = {"1", "0", "0", "0"}};
+								.IMUStrValues = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0"}};
 
 //----------------------------------------
 // Lock function used by I2C transaction
@@ -105,7 +107,7 @@ void I2CStateMachineTask(void)
 // Performs hard- and soft-iron
 // compensation on magnetometer readings.
 //----------------------------------------
-static void MagnetoCompensate()
+static void MagnetoCompensate(void)
 {
 	// Center magnetometer data
 	const float CntrMagnX = Magn.val[x] - Magn.xOffset;
@@ -116,20 +118,6 @@ static void MagnetoCompensate()
 	Magn.val[x] = Magn.M[0][0]*CntrMagnX + Magn.M[0][1]*CntrMagnY + Magn.M[0][2]*CntrMagnZ;
 	Magn.val[y] = Magn.M[1][0]*CntrMagnX + Magn.M[1][1]*CntrMagnY + Magn.M[1][2]*CntrMagnZ;
 	Magn.val[z] = Magn.M[2][0]*CntrMagnX + Magn.M[2][1]*CntrMagnY + Magn.M[2][2]*CntrMagnZ;
-}
-
-//-----------------------------------------------------------
-// Fast inverse square-root
-// See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
-//-----------------------------------------------------------
-static float invSqrt(float x) {
-	float halfx = 0.5f * x;
-	float y = x;
-	long i = *(long*)&y;
-	i = 0x5f3759df - (i>>1);
-	y = *(float*)&i;
-	y = y * (1.5f - (halfx * y * y));
-	return y;
 }
 
 //----------------------------------------
@@ -174,6 +162,9 @@ static char** IMUDataAccessor(void)
 	ftoa(IMU.yaw, 	IMU.IMUStrPtrs[4], 4);
 	ftoa(IMU.pitch, IMU.IMUStrPtrs[5], 4);
 	ftoa(IMU.roll, 	IMU.IMUStrPtrs[6], 4);
+	ftoa(IMU.pos[0],IMU.IMUStrPtrs[7], 3);
+	ftoa(IMU.pos[1],IMU.IMUStrPtrs[8], 3);
+	ftoa(IMU.pos[2],IMU.IMUStrPtrs[9], 3);
 
 	return (char**)IMU.IMUStrPtrs;
 }
@@ -230,6 +221,21 @@ void SendCSVMagnTask(void)
 	}
 }
 
+
+//-----------------------------------------------------------
+// Fast inverse square-root
+// See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
+//-----------------------------------------------------------
+static float invSqrt(float x) {
+	float halfx = 0.5f * x;
+	float y = x;
+	long i = *(long*)&y;
+	i = 0x5f3759df - (i>>1);
+	y = *(float*)&i;
+	y = y * (1.5f - (halfx * y * y));
+	return y;
+}
+
 //------------------------------------------
 // IMU Task
 //------------------------------------------
@@ -265,7 +271,7 @@ void IMUProcessingTask(void)
 	uint32_t i;
 	for(i = 0; i < 9; ++i)
 		IMU.SensorsStrPtrs[i] = &IMU.SensorsStrValues[i][0];
-	for(i = 0; i < 7; ++i)
+	for(i = 0; i < 10; ++i)
 		IMU.IMUStrPtrs[i] = &IMU.IMUStrValues[i][0];
 
 	// Suscribe a bluetooth datasource to send periodically Sensors's data
@@ -274,7 +280,7 @@ void IMUProcessingTask(void)
 																					"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
 
 	// Suscribe a bluetooth datasource to send periodically IMU's data
-	JSONDataSource* IMUds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll" }, 7, 20, IMUDataAccessor);
+	JSONDataSource* IMUds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll", "px", "py", "pz"}, 10, 20, IMUDataAccessor);
 
 	while(1)
 	{

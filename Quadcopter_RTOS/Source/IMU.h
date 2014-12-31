@@ -169,11 +169,14 @@ typedef struct
 	// Euler angles
 	float yaw, pitch, roll;
 
+	// Cartesian position
+	float pos[3];
+
 	// String pointer arrays and string values used for JSON datasources
 	char* SensorsStrPtrs[9];
 	char SensorsStrValues[9][15];
-	char* IMUStrPtrs[7];
-	char IMUStrValues[7][10];
+	char* IMUStrPtrs[10];
+	char IMUStrValues[10][10];
 } InertialMeasurementUnit;
 
 //-----------------------------------------
