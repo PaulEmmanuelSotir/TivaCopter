@@ -12,7 +12,7 @@
 #include "Utils/hw_MPU6050.h"
 
 //------------------------------------------
-// Defines MPU6050 and HMC5883L I²C
+// Defines MPU6050, HMC5883L and BMP180 I²C
 // registers and adresses we use.
 // The 14 bytes after MPU6050_O_ACCEL_XOUT_H
 // corresponds to accelerometer, temperature
@@ -27,6 +27,15 @@
 #define HMC5883L_MODE_REG			0x02			// HMC5883L Mode Register
 #define HMC5883L_DATA_REG_BEGIN		0x03			// HMC5883L Data register
 #define HMC5883L_DATA_REG_COUNT		6
+#define BMP180_I2C_ADDR				0xEE
+#define BMP180_OUT_XLSB_REG			0xF8			// OUT Registers contain temperature or pressure depending on Measurement Control register value
+#define BMP180_OUT_LSB_REG			0xF7
+#define BMP180_OUT_MSB_REG			0xF6
+#define BMP180_MEAS_CTRL_REG		0xF4
+#define BMP180_RST_REG				0xE0
+#define BMP180_ID_REG				0xD0
+#define BMP180_CALIB_REG_BEGIN		0xD0
+#define BMP180_CALIB_REG_COUNT		21
 
 //------------------------------------------
 // Constants defines
