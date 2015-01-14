@@ -119,19 +119,19 @@ char** PIDDataAccessor(void)
 //----------------------------------------
 void PIDTask(void)
 {
-	// We just want the quadcopter to be horizontal (no radio control)
-	YawPID.in = 0; PitchPID.in = 0; RollPID.in = 0;
+	// We just want the quadcopter to be horizontal when there isn't any remote control
+	YawPID.in = 0.0f; PitchPID.in = 0.0f; RollPID.in = 0.0f;
 
 	// Update radio inputs
 	GPIOPEHwi();
 
-	// Suscribe a bluetooth datasource to send periodically PID's data
-	JSONDataSource* PIDds = SuscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
-																					"YawIn", "PitchIn", "RollIn",
-																					"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically PID's data
+	JSONDataSource* PID_ds = SubscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
+																						"YawIn", "PitchIn", "RollIn",
+																						"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
 
-	// Suscribe a bluetooth datasource to send periodically Radio's data
-	JSONDataSource* Radiods = SuscribePeriodicJSONDataSource("radio", (const char*[]) {	"in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically Radio's data
+	JSONDataSource* Radio_ds = SubscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
 
 	while(1)
 	{

@@ -254,13 +254,13 @@ void IMUProcessingTask(void)
 	for(i = 0; i < 10; ++i)
 		IMU.IMUStrPtrs[i] = &IMU.IMUStrValues[i][0];
 
-	// Suscribe a bluetooth datasource to send periodically Sensors's data
-	JSONDataSource* Sensorsds = SuscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
+	// Subscribe a bluetooth datasource to send periodically Sensors's data
+	JSONDataSource* Sensorsds = SubscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
 																					"gx", "gy", "gz",
 																					"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
 
-	// Suscribe a bluetooth datasource to send periodically IMU's data
-	JSONDataSource* IMUds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll", "px", "py", "pz"}, 10, 20, IMUDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically IMU's data
+	JSONDataSource* IMUds = SubscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll", "px", "py", "pz"}, 10, 20, IMUDataAccessor);
 
 	while(1)
 	{

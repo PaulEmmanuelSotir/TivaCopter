@@ -113,7 +113,7 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 }
 
 //---------------------------------------------------------------------------
-// Suscribe command:
+// Subscribe command:
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
@@ -203,7 +203,6 @@ void EnableCmdLineInterface(UARTConsole* console)
 // This function must be called for each UART console by the user in their
 // respective UART interrupt handler.
 // User must provide corresponding console structure and interrupt status.
-// If you are using RTOS,
 //---------------------------------------------------------------------------
 void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 {
@@ -291,7 +290,7 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 					continue;
 				}
 			}
-			// else, if CTRL+C (ETX=0x03) character have been sent, we raise abrot requested flag
+			// Else, if CTRL+C (ETX=0x03) character have been sent, we raise abort requested flag
 			else if(cChar == '\x03')
 			{
 				console->IsAbortRequested = true;

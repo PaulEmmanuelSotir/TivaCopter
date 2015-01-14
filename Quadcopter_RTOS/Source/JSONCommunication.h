@@ -18,12 +18,12 @@
 typedef char** (*DataValuesGetAccessor)(void);
 typedef void (*DataValuesSetAccessor)(char**);
 
-//------------------------------------------
-// A structure gathering informations about
-// a JSON data source.
+//-------------------------------------------
+// A structure typedef gathering informations
+// about a JSON data source.
 // User should use API functions instead of
 // modifing directly members of this struct.
-//------------------------------------------
+//-------------------------------------------
 typedef struct
 {
 	// Datasource name
@@ -32,7 +32,7 @@ typedef struct
 	const char** keys;
 	// Data member count (length of arrays)
 	uint32_t dataCount;
-	// Boolean indicating wether if the datasource should send its data or not.
+	// Boolean indicating whether if the datasource should send its data or not.
 	bool enabled;
 	// Period of the data source data sending in RTOS clock ticks (0 means not periodic)
 	uint32_t period;
@@ -53,17 +53,17 @@ void JSON_enable_programatic_access_cmd(int argc, char *argv[]);
 void JSON_disable_programatic_access_cmd(int argc, char *argv[]);
 
 //--------------------------------------------
-// Suscribe data source:
+// Subscribe data source:
 // Creates a data source and add it to dynamic
 // 'dataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
 //--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(char* name,const char* keys[], uint32_t dataCount);
+JSONDataSource* SubscribeJSONDataSource(char* name,const char* keys[], uint32_t dataCount);
 
 //--------------------------------------------
-// Suscribe periodic data source:
+// Subscribe periodic data source:
 // Creates a periodic data source and add it
 // to dynamic 'dataSources' array.
 // The 'keys' array should contain 'DataCount'
@@ -72,7 +72,7 @@ JSONDataSource* SuscribeJSONDataSource(char* name,const char* keys[], uint32_t d
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
+JSONDataSource* SubscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
 
 //--------------------------------------------
 // Send data:

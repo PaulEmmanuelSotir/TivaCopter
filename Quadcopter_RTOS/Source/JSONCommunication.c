@@ -153,20 +153,20 @@ void JSON_disable_programatic_access_cmd(int argc, char *argv[])
 }
 
 //--------------------------------------------
-// Suscribe data source:
+// Subscribe data source:
 // Creates a data source and add it to dynamic
 // 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
 //--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(char* name, const char* keys[], uint32_t dataCount)
+JSONDataSource* SubscribeJSONDataSource(char* name, const char* keys[], uint32_t dataCount)
 {
-	return SuscribePeriodicJSONDataSource(name, keys, dataCount, 0, NULL);
+	return SubscribePeriodicJSONDataSource(name, keys, dataCount, 0, NULL);
 }
 
 //--------------------------------------------
-// Suscribe periodic data source:
+// Subscribe periodic data source:
 // Creates a periodic data source and add it
 // to dynamic 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
@@ -175,7 +175,7 @@ JSONDataSource* SuscribeJSONDataSource(char* name, const char* keys[], uint32_t 
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
+JSONDataSource* SubscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
 {
 	// If there is no more available space in JSONDataSources array, we allocate more memory.
 	if (JSONDataSources.used == JSONDataSources.size)

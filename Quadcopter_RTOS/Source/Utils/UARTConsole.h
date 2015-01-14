@@ -118,7 +118,7 @@ typedef struct
 void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock, uint32_t BaudRate);
 
 //---------------------------------------------------------------------------
-// Suscribe command:
+// Subscribe command:
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
