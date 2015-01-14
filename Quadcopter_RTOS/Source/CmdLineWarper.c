@@ -17,7 +17,7 @@
 #include <xdc/runtime/Log.h>				//needed for any Log_info() call
 #include <xdc/cfg/global.h> 				//header file for statically defined objects/handles
 
-#include "Utils\conversion.h"
+#include "Utils\utils.h"
 #include "Utils\UARTConsole.h"
 #include "Utils\I2CTransaction.h"
 #include "Utils\UARTConsole.h"
