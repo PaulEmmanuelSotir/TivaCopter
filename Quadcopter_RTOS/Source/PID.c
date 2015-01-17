@@ -37,6 +37,7 @@ extern InertialMeasurementUnit IMU;
 // Motor data structures
 //----------------------------------------
 static Motor Motors[4];
+static QuadControl TivacopterControl = {.RadioControlEnabled = true};
 
 //----------------------------------------
 // PID data structures
@@ -137,19 +138,19 @@ char** PIDDataAccessor(void)
 //----------------------------------------
 void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 {
-	QuadControl.throttle = atof(RemoteCtrlKeys[0]);
-	U_SAT(QuadControl.throttle, 1.0f);
+	TivacopterControl.throttle = atof(RemoteCtrlKeys[0]);
+	U_SAT(TivacopterControl.throttle, 1.0f);
 
-	QuadControl.direction[x] = atof(RemoteCtrlKeys[1]);
-	U_SAT(QuadControl.direction[x], 1.0f);
+	TivacopterControl.direction[x] = atof(RemoteCtrlKeys[1]);
+	U_SAT(TivacopterControl.direction[x], 1.0f);
 
-	QuadControl.direction[y] = atof(RemoteCtrlKeys[2]);
-	U_SAT(QuadControl.direction[y], 1.0f);
+	TivacopterControl.direction[y] = atof(RemoteCtrlKeys[2]);
+	U_SAT(TivacopterControl.direction[y], 1.0f);
 
-	QuadControl.yaw = atof(RemoteCtrlKeys[3]);
-	U_SAT(QuadControl.yaw, 1.0f);
+	TivacopterControl.yaw = atof(RemoteCtrlKeys[3]);
+	U_SAT(TivacopterControl.yaw, 1.0f);
 
-	QuadControl.beep = 't' == tolower(RemoteCtrlKeys[4][0])
+	TivacopterControl.beep = 't' == tolower(RemoteCtrlKeys[4][0])
 					&& 'r' == tolower(RemoteCtrlKeys[4][1])
 					&& 'u' == tolower(RemoteCtrlKeys[4][2])
 					&& 'e' == tolower(RemoteCtrlKeys[4][3]);
@@ -182,20 +183,20 @@ void PIDTask(void)
 		// TODO: savoir si il faudrais mettre ici un timout pour mettre la poussée des moteurs à 0.
 		Semaphore_pend(PID_Sem, BIOS_WAIT_FOREVER);
 
-		if(QuadControl.ShutOffMotors)
+		if(TivacopterControl.ShutOffMotors)
 		{
 			// Turn off motors if any problem occurs
 			TurnOffMotors();
 			return;
 		}
 
-		if(QuadControl.RadioControlEnabled && RadioInputUpdatedFlag)
+		if(TivacopterControl.RadioControlEnabled && RadioInputUpdatedFlag)
 			MapRadioInputToQuadcopterControl();
 
-		// Map QuadControl to PIDs input
-		YawPID.in = QuadControl.yaw;
-		PitchPID.in = PI/4 * QuadControl.direction[x];
-		RollPID.in = PI/4 * QuadControl.direction[y];
+		// Map TivacopterControl to PIDs input
+		YawPID.in = TivacopterControl.yaw;
+		PitchPID.in = PI/4 * TivacopterControl.direction[x];
+		RollPID.in = PI/4 * TivacopterControl.direction[y];
 
 		// Get error using euler angles from IMU
 		PitchPID.error = IMU.pitch - PitchPID.in;
@@ -205,12 +206,12 @@ void PIDTask(void)
 		ProcessPID(&RollPID);
 
 		// Convert euler angles to motors command
-		Motors[0].power =   PitchPID.out + RollPID.out + QuadControl.throttle;
-		Motors[1].power = - PitchPID.out + RollPID.out + QuadControl.throttle;
-		Motors[2].power = - PitchPID.out - RollPID.out + QuadControl.throttle;
-		Motors[3].power =   PitchPID.out - RollPID.out + QuadControl.throttle;
+		Motors[0].power =   PitchPID.out + RollPID.out + TivacopterControl.throttle;
+		Motors[1].power = - PitchPID.out + RollPID.out + TivacopterControl.throttle;
+		Motors[2].power = - PitchPID.out - RollPID.out + TivacopterControl.throttle;
+		Motors[3].power =   PitchPID.out - RollPID.out + TivacopterControl.throttle;
 
-		if(QuadControl.yawRegulationEnabled)
+		if(TivacopterControl.yawRegulationEnabled)
 		{
 			YawPID.error = IMU.yaw - YawPID.in;
 			ProcessPID(&YawPID);
@@ -288,39 +289,39 @@ static void MapRadioInputToQuadcopterControl(void)
 {
 	if(RadioIn[0] == "1")
 	{
-		QuadControl.throttle += 0.01;
-		U_SAT(QuadControl.throttle, 1.0f);
+		TivacopterControl.throttle += 0.01;
+		U_SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
-		QuadControl.throttle = 0;
+		TivacopterControl.throttle = 0;
 
 	if(RadioIn[1] == "1")
 	{
-		QuadControl.direction[x] += 0.01;
-		SAT(QuadControl.direction[x], 1.0f);
+		TivacopterControl.direction[x] += 0.01;
+		SAT(TivacopterControl.direction[x], 1.0f);
 	}
 	else if(RadioIn[2] == "1")
 	{
-		QuadControl.direction[x] -= 0.01;
-		SAT(QuadControl.throttle, 1.0f);
+		TivacopterControl.direction[x] -= 0.01;
+		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
-		QuadControl.direction[x] = 0;
+		TivacopterControl.direction[x] = 0;
 
 	if(RadioIn[3] == "1")
 	{
-		QuadControl.direction[y] += 0.01;
-		SAT(QuadControl.throttle, 1.0f);
+		TivacopterControl.direction[y] += 0.01;
+		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else if(RadioIn[4] == "1")
 	{
-		QuadControl.direction[y] -= 0.01;
-		SAT(QuadControl.throttle, 1.0f);
+		TivacopterControl.direction[y] -= 0.01;
+		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
-		QuadControl.direction[y] = 0;
+		TivacopterControl.direction[y] = 0;
 
 	// When we control quadcopter by radio, the quadcopter orientation is always ahead
-	QuadControl.yaw = atan2(QuadControl.direction[y], QuadControl.direction[x]);
+	TivacopterControl.yaw = atan2(TivacopterControl.direction[y], TivacopterControl.direction[x]);
 
 }

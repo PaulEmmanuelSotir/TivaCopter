@@ -47,7 +47,7 @@ typedef struct PID
 //----------------------------------------
 // Quadcopter control structure
 //----------------------------------------
-static struct
+typedef struct
 {
 	// Global motor throttle control
 	float throttle;
@@ -62,7 +62,7 @@ static struct
 	bool ShutOffMotors;
 	// Boolean indicating wether if radio control is enabled.
 	bool RadioControlEnabled;
-} QuadControl = {.RadioControlEnabled = true};
+}QuadControl;
 
 //----------------------------------------
 // Motor PWM control structure typedef
@@ -71,7 +71,7 @@ typedef struct
 {
 	char strPower[10];
 	float power;
-} Motor;
+}Motor;
 
 //----------------------------------------
 // GPIO Port E Hardware Interrupt (radio)
