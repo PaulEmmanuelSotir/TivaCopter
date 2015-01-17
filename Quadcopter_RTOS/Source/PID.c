@@ -289,7 +289,7 @@ static void MapRadioInputToQuadcopterControl(void)
 {
 	if(RadioIn[0] == "1")
 	{
-		TivacopterControl.throttle += 0.01;
+		TivacopterControl.throttle += 0.0005;
 		U_SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
@@ -297,12 +297,12 @@ static void MapRadioInputToQuadcopterControl(void)
 
 	if(RadioIn[1] == "1")
 	{
-		TivacopterControl.direction[x] += 0.01;
+		TivacopterControl.direction[x] += 0.0005;
 		SAT(TivacopterControl.direction[x], 1.0f);
 	}
 	else if(RadioIn[2] == "1")
 	{
-		TivacopterControl.direction[x] -= 0.01;
+		TivacopterControl.direction[x] -= 0.0005;
 		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
@@ -310,12 +310,12 @@ static void MapRadioInputToQuadcopterControl(void)
 
 	if(RadioIn[3] == "1")
 	{
-		TivacopterControl.direction[y] += 0.01;
+		TivacopterControl.direction[y] += 0.0005;
 		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else if(RadioIn[4] == "1")
 	{
-		TivacopterControl.direction[y] -= 0.01;
+		TivacopterControl.direction[y] -= 0.0005;
 		SAT(TivacopterControl.throttle, 1.0f);
 	}
 	else
