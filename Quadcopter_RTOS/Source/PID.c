@@ -176,7 +176,7 @@ void PIDTask(void)
 	JSONDataSource* Radio_ds = SuscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
 
 	// Subscribe a bluetooth datainput to receive remote control data
-	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControlOrder", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
+	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControl", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
 
 	while(1)
 	{
