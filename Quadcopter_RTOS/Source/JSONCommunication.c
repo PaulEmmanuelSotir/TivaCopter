@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 //----------------------------------------
 // BIOS header files
@@ -30,7 +31,7 @@
 #include "JSONCommunication.h"
 
 static bool JSONCommunicationStarted = false;
-static bool JSONProgrammaticAccesMode = false;
+static bool JSONProgrammaticAccessMode = false;
 
 //----------------------------------------
 // UART console from 'main.c'
@@ -144,7 +145,7 @@ void JSON_enable_programatic_access_cmd(int argc, char *argv[])
 {
 	if(checkArgCount(&Console, argc, 1))
 	{
-		JSONProgrammaticAccesMode = true;
+		JSONProgrammaticAccessMode = true;
 		UARTwrite(&Console, "Programmatic access mode enabled.", 33);
 	}
 }
@@ -157,9 +158,18 @@ void JSON_disable_programatic_access_cmd(int argc, char *argv[])
 {
 	if(checkArgCount(&Console, argc, 1))
 	{
-		JSONProgrammaticAccesMode = false;
+		JSONProgrammaticAccessMode = false;
 		UARTwrite(&Console, "Programmatic access mode disabled.", 34);
 	}
+}
+
+//------------------------------------------
+// New JSON object received:
+// Called by UART console when a newline
+// character is received.
+//------------------------------------------
+static void NewJSONObjectReceived(char c)
+{
 }
 
 //--------------------------------------------
@@ -220,7 +230,7 @@ JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], u
 		Error_init(&eb);
 		Clock_Params_init(&clockParams);
 		clockParams.period = period;
-		clockParams.startFlag = TRUE;
+		clockParams.startFlag = true;
 		clockParams.arg = (UArg)newSource;
 		if(Clock_create(PeriodicJSONDataSendingSwi, period, &clockParams, &eb) == NULL)
 		{
@@ -266,7 +276,7 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 			{
 				if(ds->enabled)
 				{
-					UARTwrite(&Console, JSONProgrammaticAccesMode ? "\n{ " : "\n{\n", 3);
+					UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
 
 					for(valIdx = 0; valIdx < ds->dataCount; ++valIdx)
 					{
@@ -281,10 +291,10 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 						// Don't append comma if we are printing the last element
 						const char* comma = valIdx == ds->dataCount-1 ? "" : ",";
 
-						UARTprintf(&Console, JSONProgrammaticAccesMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
+						UARTprintf(&Console, JSONProgrammaticAccessMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
 					}
 
-					UARTwrite(&Console, JSONProgrammaticAccesMode ? " }" : "\n}", 2);
+					UARTwrite(&Console, JSONProgrammaticAccessMode ? " }" : "\n}", 2);
 
 					// Send data now to avoid data losses due to limited buffer size
 					UARTFlushTx(&Console, false);
@@ -315,7 +325,7 @@ void PeriodicJSONDataSendingTask(void)
 	sucess = sucess && SubscribeCmd(&Console, "listSources", 	JSON_list_sources_cmd, 	"List all available JSON data sources.");
 	sucess = sucess && SubscribeCmd(&Console, "enable", 		JSON_enable_cmd, 		"Enables specified JSON data source's stream (only active once \'start\' have been called).");
 	sucess = sucess && SubscribeCmd(&Console, "disable", 		JSON_disable_cmd, 		"Disables specified JSON data source's stream.");
-	sucess = sucess && SubscribeCmd(&Console, "start", 			JSON_start_cmd, 		"Starts JSON communication.");
+	sucess = sucess && SubscribeListeningCmd(&Console, "start", JSON_start_cmd, 		"Starts JSON communication.", "\n", NewJSONObjectReceived);
 	sucess = sucess && SubscribeCmd(&Console, "progModeEn", 	JSON_enable_programatic_access_cmd, 	"Enables programmatic access mode. (newline means new JSON object)");
 	sucess = sucess && SubscribeCmd(&Console, "progModeDis", 	JSON_disable_programatic_access_cmd, 	"Disables programmatic access mode.");
 	if(!sucess)
@@ -339,7 +349,7 @@ void PeriodicJSONDataSendingTask(void)
 				JSONDataSource* ds = &JSONDataSources.array[dsIdx];
 				if(ds->sendNowFlag && ds->enabled)
 				{
-					UARTwrite(&Console, JSONProgrammaticAccesMode ? "\n{ " : "\n{\n", 3);
+					UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
 
 					// Get value string pointer array from JSON data source
 					char** values = ds->dataAccessor();
@@ -358,13 +368,17 @@ void PeriodicJSONDataSendingTask(void)
 						// Don't append comma if we are printing the last element
 						const char* comma = valIdx == ds->dataCount-1 ? "" : ",";
 
-						UARTprintf(&Console, JSONProgrammaticAccesMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
+						UARTprintf(&Console, JSONProgrammaticAccessMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
 					}
 
-					UARTwrite(&Console, JSONProgrammaticAccesMode ? " }" : "\n}", 2);
+					UARTwrite(&Console, JSONProgrammaticAccessMode ? " }" : "\n}", 2);
 
-					// Send data now to avoid data losses due to limited buffer size
-					UARTFlushTx(&Console, false);
+					// If Tx UART console buffer is near to be full, we wait for UART transmition
+					// TODO: trouver mieux !
+					uint32_t timeout = ds->period;
+					if(UARTTxBytesFree(&Console) < 128)
+						while(UARTTxBytesFree(&Console) < 1024 && --timeout)
+							Task_sleep(1);
 
 					ds->sendNowFlag = false;
 				}

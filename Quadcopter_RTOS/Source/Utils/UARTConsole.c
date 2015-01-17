@@ -25,31 +25,31 @@
 
 //--------------------------------------------
 // Macros to advance receive or tranmit buffer
-// index.
+// index
 //--------------------------------------------
 #define ADVANCE_TX_BUFFER_INDEX(Index)	(Index) = ((Index) + 1) % UART_TX_BUFFER_SIZE
 #define ADVANCE_RX_BUFFER_INDEX(Index)	(Index) = ((Index) + 1) % UART_RX_BUFFER_SIZE
 
 //-------------------------------------------
 // A mapping from an integer between 0 and 15
-// to its ASCII character equivalent.
+// to its ASCII character equivalent
 //-------------------------------------------
 static const char* const ASCIIHexMap = "0123456789abcdef";
 
 //------------------------------------------
 // The list of possible base addresses for
-// the console UART.
+// the console UART
 //------------------------------------------
 static const uint32_t UARTBases[4] = { UART0_BASE, UART1_BASE, UART2_BASE, UART3_BASE };
 
 //------------------------------------------
 // The list of possible interrupts for the
-// console UART.
+// console UART
 //------------------------------------------
 static const uint32_t UARTInts[4] = { INT_UART0, INT_UART1, INT_UART2, INT_UART3 };
 
 //------------------------------------------
-// The list of UART peripherals.
+// The list of UART peripherals
 //------------------------------------------
 static const uint32_t UARTPeriphs[4] = { SYSCTL_PERIPH_UART0, SYSCTL_PERIPH_UART1, SYSCTL_PERIPH_UART2, SYSCTL_PERIPH_UART3 };
 
@@ -57,6 +57,7 @@ static const uint32_t UARTPeriphs[4] = { SYSCTL_PERIPH_UART0, SYSCTL_PERIPH_UART
 // Static function forward declarations
 //------------------------------------------
 static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length);
+static void NotifyCharacterReceived(UARTConsole* console, char c);
 static void UARTPrimeTransmit(UARTConsole* console);
 static bool IsBufferEmpty(volatile uint32_t *pui32Read, volatile uint32_t *pui32Write);
 static bool IsBufferFull(volatile uint32_t *pui32Read, volatile uint32_t *pui32Write, uint32_t ui32Size);
@@ -75,6 +76,7 @@ static uint32_t GetBufferCount(volatile uint32_t *pui32Read, volatile uint32_t *
 void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock, uint32_t BaudRate)
 {
 	// Check the arguments.
+	ASSERT(console != NULL);
 	ASSERT((PortNum == 0) || (PortNum == 1) || (PortNum == 2) || (PortNum == 3));
 
 	// Check to make sure the UART peripheral is present.
@@ -90,7 +92,7 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 	// Enable the UART peripheral for use.
 	MAP_SysCtlPeripheralEnable(UARTPeriphs[PortNum]);
 
-	// Configure the UART for 115200, n, 8, 1
+	// Configure the UART for n, 8, 1 at specified baudrate
 	MAP_UARTConfigSetExpClk(console->UARTBase, SrcClock, BaudRate, (UART_CONFIG_PAR_NONE | UART_CONFIG_STOP_ONE | UART_CONFIG_WLEN_8));
 
 	// Set the UART to interrupt whenever the TX FIFO is almost empty or when any character is received.
@@ -117,8 +119,12 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
-bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp cmdApp, const char* cmdHelp)
+bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp app, const char* help)
 {
+	ASSERT(console != NULL);
+	ASSERT(app != NULL);
+	ASSERT(name != "" && name != NULL);
+
 	// If there is no more available space in dynamic command array, we allocate more memory.
 	if (console->CmdTable.used == console->CmdTable.size)
 	{
@@ -136,9 +142,48 @@ bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp cmdApp, const c
 	}
 
 	CmdLineEntry* newCmd = &console->CmdTable.array[console->CmdTable.used++];
-	newCmd->cmdName = name;
-	newCmd->cmdApp = cmdApp;
-	newCmd->cmdHelp = cmdHelp;
+	newCmd->name = name;
+	newCmd->app = app;
+	newCmd->help = help;
+
+	return true;
+}
+
+//---------------------------------------------------------------------------
+// Suscribe listening command:
+// Add a command line entry, which can listen for any received character
+// among the given array, to a dynamic command table of specified console.
+// Returns false if dynamic memory allocation failed.
+//---------------------------------------------------------------------------
+bool SubscribeListeningCmd(UARTConsole* console, const char* name, CmdApp app, const char* help, const char* interestingChars, ListeningCallback cb)
+{
+	ASSERT(console != NULL);
+	ASSERT(app != NULL);
+	ASSERT(name != "" && name != NULL);
+
+	// If there is no more available space in dynamic command array, we allocate more memory.
+	if (console->CmdTable.used == console->CmdTable.size)
+	{
+		console->CmdTable.size += 4;
+		console->CmdTable.array = (CmdLineEntry *)realloc(console->CmdTable.array, console->CmdTable.size * sizeof(CmdLineEntry));
+
+		// Verify wether if any error occured during memory allocation.
+		if (console->CmdTable.array == NULL)
+		{
+			console->CmdTable.size = 0;
+			console->CmdTable.used = 0;
+			free(console->CmdTable.array);
+			return false;
+		}
+	}
+
+	CmdLineEntry* newCmd = &console->CmdTable.array[console->CmdTable.used++];
+	newCmd->name = name;
+	newCmd->app = app;
+	newCmd->help = help;
+	newCmd->interestingChars = interestingChars;
+	newCmd->cb = cb;
+
 	return true;
 }
 
@@ -174,6 +219,8 @@ bool checkArgCount(UARTConsole* console, int argc, int expected)
 //----------------------------------------------------------------------------
 void DisableCmdLineInterface(UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	console->CmdLineInterfaceDisabled = true;
 }
 
@@ -182,8 +229,13 @@ void DisableCmdLineInterface(UARTConsole* console)
 //----------------------------------------------------------------------------
 void EnableCmdLineInterface(UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	if(console->CmdLineInterfaceDisabled)
 	{
+		console->CurrentlyRunningCmd = NULL;
+		UARTFlushTx(console, true);
+		UARTFlushRx(console);
 		UARTwrite(console, "\n> ", 3);
 		console->CmdLineInterfaceDisabled = false;
 	}
@@ -192,18 +244,17 @@ void EnableCmdLineInterface(UARTConsole* console)
 }
 
 //---------------------------------------------------------------------------
-// Handles UART interrupts.
+// Console UART interrupt handler:
 // This function handles interrupts from the UART corresponding to specified
 // console.
 // It will copy data from the transmit buffer to the UART transmit FIFO if
 // space is available, and it will copy data from the UART receive FIFO to
 // the receive buffer if data is available.
 // It will also trigger registered applications if appropriate commands are
-// received and handle
+// received and handle console special characters like backspace.
 // This function must be called for each UART console by the user in their
 // respective UART interrupt handler.
 // User must provide corresponding console structure and interrupt status.
-// If you are using RTOS,
 //---------------------------------------------------------------------------
 void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 {
@@ -211,6 +262,8 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 	int32_t i32Char;
 	static bool bLastWasCR = false;
 	static char buffer[UART_RX_BUFFER_SIZE+1];
+
+	ASSERT(console != NULL);
 
 	// Are we being interrupted because the TX FIFO has space available?
 	if(IntStatus & UART_INT_TX)
@@ -236,7 +289,6 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 			// If command line interface is disabled, we skip the various text filtering  operations.
 			if(!console->CmdLineInterfaceDisabled)
 			{
-				// Reset IsAbortRequested flag
 				console->IsAbortRequested = false;
 
 				// Handle backspace by erasing the last character in the buffer.
@@ -310,6 +362,9 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 				// buffer so that the user gets some immediate feedback (echo).
 				if(!console->CmdLineInterfaceDisabled)
 					UARTwrite(console, (const char *)&cChar, 1);
+				// Else, notify the running command that we received a character if this command is listenning to this specific character
+				else
+					NotifyCharacterReceived(console, cChar);
 			}
 		}
 
@@ -320,12 +375,27 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 }
 
 //----------------------------------------------------------------------------
+// Notify character received:
+// Notify the currently running command that we received a character if this
+// command is listening to this specific character and if the command line
+// interface is disabled.
+//----------------------------------------------------------------------------
+static void NotifyCharacterReceived(UARTConsole* console, char c)
+{
+	if(console->CurrentlyRunningCmd && console->CmdLineInterfaceDisabled)
+		if(strchr(console->CurrentlyRunningCmd->interestingChars, c) != NULL)
+			console->CurrentlyRunningCmd->cb(c);
+}
+
+//----------------------------------------------------------------------------
 // Is abort requested:
 // Indicates wether if current command execution need to be aborted.
 // User can abort a command by typing 'CTRL+C' in the command line interface.
 //----------------------------------------------------------------------------
 bool IsAbortRequested(const UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	return console->IsAbortRequested;
 }
 
@@ -390,6 +460,8 @@ static uint32_t GetBufferCount(volatile uint32_t *pui32Read, volatile uint32_t *
 //--------------------------------------------
 static void UARTPrimeTransmit(UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	// Do we have any data to transmit?
 	if(!IsBufferEmpty(&console->UARTTxReadIndex, &console->UARTTxWriteIndex))
 	{
@@ -436,9 +508,8 @@ int UARTwrite(UARTConsole* console, const char *pcBuf, uint32_t ui32Len)
 {
 	unsigned int uIdx;
 
-	// Check for valid arguments.
-	ASSERT(pcBuf != 0);
-	ASSERT(console->UARTBase != 0);
+	ASSERT(console != NULL);
+	ASSERT(pcBuf != NULL);
 
 	// Send the characters
 	for(uIdx = 0; uIdx < ui32Len; uIdx++)
@@ -515,10 +586,9 @@ int UARTgets(UARTConsole* console, char *pcBuf, uint32_t ui32Len)
 	uint32_t ui32Count = 0;
 	int8_t cChar;
 
-	// Check the arguments.
-	ASSERT(pcBuf != 0);
+	ASSERT(console != NULL);
+	ASSERT(pcBuf != NULL);
 	ASSERT(ui32Len != 0);
-	ASSERT(console->UARTBase != 0);
 
 	// Adjust the length back by 1 to leave space for the trailing null terminator.
 	ui32Len--;
@@ -577,6 +647,8 @@ unsigned char UARTgetc(UARTConsole* console)
 {
 	unsigned char cChar;
 
+	ASSERT(console != NULL);
+
 	// Wait for a character to be received (if the buffer is currently empty).
 	while(IsBufferEmpty(&console->UARTRxReadIndex, &console->UARTRxWriteIndex)) { }
 
@@ -627,8 +699,8 @@ void UARTvprintf(UARTConsole* console, const char *pcString, va_list vaArgP)
 	uint32_t ui32Idx, ui32Value, ui32Pos, ui32Count, ui32Base, ui32Neg;
 	char *pcStr, pcBuf[16], cFill;
 
-	// Check the arguments.
-	ASSERT(pcString != 0);
+	ASSERT(console != NULL);
+	ASSERT(pcString != NULL);
 
 	// Loop while there are more characters in the string.
 	while(*pcString)
@@ -923,6 +995,8 @@ void UARTprintf(UARTConsole* console, const char *pcString, ...)
 //-------------------------------------------
 int UARTRxBytesAvail(UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	return(GetBufferCount(&console->UARTRxReadIndex, &console->UARTRxWriteIndex, UART_RX_BUFFER_SIZE));
 }
 
@@ -933,6 +1007,8 @@ int UARTRxBytesAvail(UARTConsole* console)
 //-------------------------------------------
 int UARTTxBytesFree(UARTConsole* console)
 {
+	ASSERT(console != NULL);
+
 	return UART_TX_BUFFER_SIZE - GetBufferCount(&console->UARTTxReadIndex, &console->UARTTxWriteIndex, UART_TX_BUFFER_SIZE);
 }
 
@@ -958,6 +1034,8 @@ int UARTPeek(UARTConsole* console, unsigned char ucChar)
 	int iCount;
 	int iAvail;
 	uint32_t ui32ReadIndex;
+
+	ASSERT(console != NULL);
 
 	// How many characters are there in the receive buffer?
 	iAvail = (int)(GetBufferCount(&console->UARTRxReadIndex, &console->UARTRxWriteIndex, UART_RX_BUFFER_SIZE));
@@ -993,6 +1071,8 @@ void UARTFlushRx(UARTConsole* console)
 {
 	uint32_t ui32Int;
 
+	ASSERT(console != NULL);
+
 	// Temporarily turn off interrupts.
 	ui32Int = MAP_IntMasterDisable();
 
@@ -1021,6 +1101,8 @@ void UARTFlushRx(UARTConsole* console)
 void UARTFlushTx(UARTConsole* console, bool bDiscard)
 {
 	uint32_t ui32Int;
+
+	ASSERT(console != NULL);
 
 	// Should the remaining data be discarded or transmitted?
 	if(bDiscard)
@@ -1116,7 +1198,7 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
 
     		for(cntr = 0; cntr < console->CmdTable.used; ++cntr)
     		{
-    			UARTprintf(console, " - %s:		%s\n", console->CmdTable.array[cntr].cmdName, console->CmdTable.array[cntr].cmdHelp);
+    			UARTprintf(console, " - %s:		%s\n", console->CmdTable.array[cntr].name, console->CmdTable.array[cntr].help);
     		}
     		UARTwrite(console, "\n> ", 3);
     		return;
@@ -1130,13 +1212,18 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
     	{
     		// If this command entry command string matches argv[0], then call
     		// the function for this command, passing the command line arguments.
-    		if(!strcmp(console->Argv[0], psCmdEntry->cmdName))
+    		if(!strcmp(console->Argv[0], psCmdEntry->name))
     		{
-    			psCmdEntry->cmdApp(ui8Argc, console->Argv);
+    			console->CurrentlyRunningCmd = psCmdEntry;
+    			psCmdEntry->app(ui8Argc, console->Argv);
 
     			// If cmd app didn't disabled command line interface, we ask user for entering a new command ('> ')
     			if(!console->CmdLineInterfaceDisabled)
+    			{
     				UARTwrite(console, "\n\n> ", 4);
+        			console->CurrentlyRunningCmd = NULL;
+    			}
+
     			return;
     		}
 

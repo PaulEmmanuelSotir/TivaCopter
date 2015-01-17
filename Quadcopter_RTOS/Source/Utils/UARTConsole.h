@@ -19,7 +19,7 @@
 // receive buffers respectively.
 //-----------------------------------------------
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     128
+#define UART_RX_BUFFER_SIZE     512
 #endif
 #ifndef UART_TX_BUFFER_SIZE
 #define UART_TX_BUFFER_SIZE     4096
@@ -44,23 +44,29 @@
 */
 
 //------------------------------------------
-// Command line function callback type.
+// Command line function callback typedef
 //------------------------------------------
 typedef void (*CmdApp)(int argc, char *argv[]);
+typedef void (*ListeningCallback)(char c);
 
 //------------------------------------------
 // Private structure typedef describing a
-// command.
+// command that can listen to some character
+// input
 //------------------------------------------
 typedef struct
 {
-    // A pointer to a string containing the name of the command.
-    const char *cmdName;
-    // A function pointer to the implementation of the command.
-    CmdApp cmdApp;
-    // A pointer to a string of brief help text for the command.
-    const char *cmdHelp;
-} CmdLineEntry;
+    // A pointer to a string containing the name of the command
+    const char* name;
+    // A function pointer to the implementation of the command
+    CmdApp app;
+    // A pointer to a string of brief help text for the command
+    const char* help;
+    // An array of all characters that will be listened for
+    const char* interestingChars;
+    // Callback used when interesting char is received
+    ListeningCallback cb;
+}CmdLineEntry;
 
 //--------------------------------------------
 // A structure gathering informations about an
@@ -78,10 +84,11 @@ typedef struct
 	// Dynamic command table provided by the user
 	struct
 	{
-		CmdLineEntry *array;
+		CmdLineEntry* array;
 		uint32_t used;
 		uint32_t size;
 	} CmdTable;
+	CmdLineEntry* CurrentlyRunningCmd;
 
 	// Output ring buffer. Buffer is full if UARTTxReadIndex is one ahead of
 	// UARTTxWriteIndex. Buffer is empty if  the two indices are the same.
@@ -122,7 +129,15 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 // Add a command line entry to a dynamic command table of specified console.
 // Returns false if dynamic memory allocation failed.
 //---------------------------------------------------------------------------
-bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp cmdApp, const char* cmdHelp);
+bool SubscribeCmd(UARTConsole* console, const char* name, CmdApp app, const char* help);
+
+//---------------------------------------------------------------------------
+// Suscribe listening command:
+// Add a command line entry, which can listen for any received character
+// among the given array, to a dynamic command table of specified console.
+// Returns false if dynamic memory allocation failed.
+//---------------------------------------------------------------------------
+bool SubscribeListeningCmd(UARTConsole* console, const char* name, CmdApp app, const char* help, const char* interestingChars, ListeningCallback cb);
 
 //---------------------------------------------------------------------------
 // Check argument count:
@@ -154,7 +169,7 @@ void DisableCmdLineInterface(UARTConsole* console);
 //----------------------------------------------------------------------------
 void EnableCmdLineInterface(UARTConsole* console);
 
-//---------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 // Handles UART interrupts.
 // This function handles interrupts from the UART corresponding to specified
 // console.
@@ -167,7 +182,7 @@ void EnableCmdLineInterface(UARTConsole* console);
 // respective UART interrupt handler.
 // User must provide corresponding console structure and interrupt status.
 // If you are using RTOS,
-//---------------------------------------------------------------------------
+//----------------------------------------------------------------------------
 void ConsoleUARTIntHandler(UARTConsole* console,  uint32_t IntStatus);
 
 int UARTwrite(UARTConsole* console, const char *pcBuf, uint32_t ui32Len);
