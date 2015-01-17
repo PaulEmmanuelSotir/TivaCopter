@@ -41,6 +41,25 @@ typedef struct
 	bool sendNowFlag;
 } JSONDataSource;
 
+//-------------------------------------------
+// A structure typedef gathering informations
+// about a JSON data input.
+// User should use API functions instead of
+// modifing directly members of this struct.
+//-------------------------------------------
+typedef struct
+{
+	// Datas input name
+	char* name;
+	// Data names table
+	const char** keys;
+	// Data member count (length of arrays)
+	uint32_t dataCount;
+	DataValuesSetAccessor dataAccessor;
+	// Boolean indicating whether if the the strucure contains unread data.
+	bool updated;
+} JSONDataInput;
+
 //----------------------------------------
 // UART console commands for JSON
 // communication.
@@ -95,5 +114,16 @@ void PeriodicJSONDataSendingTask(void);
 // Periodic data sending software interrupt
 //-----------------------------------------
 void PeriodicJSONDataSendingSwi(UArg dataSource);
+
+//--------------------------------------------
+// Subscribe JSON data input
+// Subscribe to incomming data corresponding
+// to given input name and key.
+// The 'keys' array should contain 'DataCount'
+// names of the data fields that will be
+// populated as soon as corresponding JSON
+// data is received.
+//--------------------------------------------
+JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t dataCount, DataValuesSetAccessor dataAccessor);
 
 #endif /* JSON_COMMUNICATION_H_ */

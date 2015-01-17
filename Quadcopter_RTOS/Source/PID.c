@@ -131,6 +131,31 @@ char** PIDDataAccessor(void)
 }
 
 //----------------------------------------
+// Remote control data set accessor:
+// Accessor used by bluetooth to set data
+// from remote control data input.
+//----------------------------------------
+void RemoteControlDataAccessor(char** RemoteCtrlKeys)
+{
+	QuadControl.throttle = atof(RemoteCtrlKeys[0]);
+	U_SAT(QuadControl.throttle, 1.0f);
+
+	QuadControl.direction[x] = atof(RemoteCtrlKeys[1]);
+	U_SAT(QuadControl.direction[x], 1.0f);
+
+	QuadControl.direction[y] = atof(RemoteCtrlKeys[2]);
+	U_SAT(QuadControl.direction[y], 1.0f);
+
+	QuadControl.yaw = atof(RemoteCtrlKeys[3]);
+	U_SAT(QuadControl.yaw, 1.0f);
+
+	QuadControl.beep = 't' == tolower(RemoteCtrlKeys[4][0])
+					&& 'r' == tolower(RemoteCtrlKeys[4][1])
+					&& 'u' == tolower(RemoteCtrlKeys[4][2])
+					&& 'e' == tolower(RemoteCtrlKeys[4][3]);
+}
+
+//----------------------------------------
 // PID task
 //----------------------------------------
 void PIDTask(void)
@@ -148,6 +173,9 @@ void PIDTask(void)
 
 	// Suscribe a bluetooth datasource to send periodically Radio's data
 	JSONDataSource* Radio_ds = SuscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
+
+	// Subscribe a bluetooth datainput to receive remote control data
+	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControlOrder", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
 
 	while(1)
 	{

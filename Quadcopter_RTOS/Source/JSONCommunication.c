@@ -48,6 +48,16 @@ static struct
 } JSONDataSources = {NULL, 0, 0};
 
 //----------------------------------------
+// Private dynamic JSON data inputs array
+//----------------------------------------
+static struct
+{
+	JSONDataInput *array;
+	uint32_t used;
+	uint32_t size;
+} JSONDataInputs = {NULL, 0, 0};
+
+//----------------------------------------
 // list sources:
 // List all available JSON data source.
 //----------------------------------------
@@ -386,5 +396,43 @@ static void PeriodicJSONDataSendingSwi(UArg dataSource)
 			Semaphore_post(PeriodicJSON_Sem);
 		}
 	}
+}
+
+//--------------------------------------------
+// Subscribe JSON data input:
+// Subscribe to incomming data corresponding
+// to given input name and keys.
+// The 'keys' array should contain 'DataCount'
+// names of the data fields that will be
+// populated as soon as corresponding JSON
+// data is received.
+//--------------------------------------------
+JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t dataCount, DataValuesSetAccessor dataAccessor)
+{
+	// If there is no more available space in JSONDataSources array, we allocate more memory.
+	if (JSONDataInputs.used == JSONDataInputs.size)
+	{
+		JSONDataInputs.size += 2;
+		JSONDataInputs.array = (JSONDataInput *)realloc(JSONDataInputs.array, JSONDataInputs.size * sizeof(JSONDataInputs));
+
+		// Verify wether if any error occured during memory allocation.
+		if (JSONDataInputs.array == NULL)
+		{
+			JSONDataInputs.size = 0;
+			JSONDataInputs.used = 0;
+			free(JSONDataInputs.array);
+			Log_error0("Error (re)allocating memory for JSON datainputs.");
+			return NULL;
+		}
+	}
+
+	JSONDataInput* newInput = &JSONDataInputs.array[JSONDataInputs.used++];
+	newInput->name = name;
+	newInput->keys = keys;
+	newInput->dataCount = dataCount;
+	newInput->updated = false;
+	newInput->dataAccessor = dataAccessor;
+
+	return newInput;
 }
 
