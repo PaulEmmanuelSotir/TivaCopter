@@ -34,8 +34,6 @@
 #define SAMPLE_FREQ					400.0f			// sample frequency in Hz, TODO: determine PERIOD at runtime (not frequency)
 #define SAMPLE_PERIOD				1.0f/SAMPLE_FREQ
 #define BETA						0.1f			// 2 *  Madgwick AHRS algorithm proportional gain
-#define PI							3.14159265358979323846
-#define G							9.80665
 
 //-------------------------------------------------------------------------
 // HMC5883L mesurement mode defines:

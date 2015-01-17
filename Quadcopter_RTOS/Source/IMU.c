@@ -22,7 +22,7 @@
 #include "driverlib/debug.h"
 
 #include "math.h"
-#include "Utils/conversion.h"
+#include "Utils/utils.h"
 #include "Utils/I2CTransaction.h"
 #include "Utils/UARTConsole.h"
 #include "Utils/quaternions.h"
@@ -34,11 +34,6 @@
 // UART console from 'main.c'
 //----------------------------------------
 extern UARTConsole Console;
-
-//----------------------------------------
-// Enum allowing clearer data accesses
-//----------------------------------------
-enum { x, y, z };
 
 //----------------------------------------
 // IMU data structures definition
@@ -219,21 +214,6 @@ void SendCSVMagnTask(void)
 		// Restart command line interface if user aborted
 		EnableCmdLineInterface(&Console);
 	}
-}
-
-
-//-----------------------------------------------------------
-// Fast inverse square-root
-// See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
-//-----------------------------------------------------------
-static float invSqrt(float x) {
-	float halfx = 0.5f * x;
-	float y = x;
-	long i = *(long*)&y;
-	i = 0x5f3759df - (i>>1);
-	y = *(float*)&i;
-	y = y * (1.5f - (halfx * y * y));
-	return y;
 }
 
 //------------------------------------------

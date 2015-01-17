@@ -5,50 +5,33 @@
 #ifndef PID_H_
 #define PID_H_
 
+#include <stdint.h>
+
 // We use 'SAMPLE_FREQ' define from 'IMU.h' as PID's integration and derivation is triggered by IMU task
 #include "IMU.h"
 #include "PinMap.h"
 
 //----------------------------------------
-// Pitch/roll and yaw PID gains:
-// We use the same gains for pitch
-// and roll as quadcopter is symetric.
-//----------------------------------------
-// Yaw
-#define	YAW_KP			0.03500
-#define	YAW_KI			0.03500
-#define	YAW_KD			0.000000
-#define	YAW_I_LIMIT		0.300000
-// Pitch
-#define	PITCH_KP		0.04000
-#define	PITCH_KI		0.12000
-#define	PITCH_KD		0.00010
-#define	PITCH_I_LIMIT	0.300000
-// roll
-#define	ROLL_KP			PITCH_KP
-#define	ROLL_KI			PITCH_KI
-#define	ROLL_KD			PITCH_KD
-#define	ROLL_I_LIMIT	PITCH_I_LIMIT
-
-//----------------------------------------
-// Maximum absolute command euler angles
-//----------------------------------------
-#define MAX_YAW			PI
-#define MAX_PITCH		PI
-#define MAX_ROLL		PI
-
-//----------------------------------------
 // Maximum and minimum motor command
 //----------------------------------------
-#define MAX_MOTOR		PIOSC_FREQ*0.002
-#define MIN_MOTOR		PIOSC_FREQ*0.001
+#define MAX_MOTOR				PIOSC_FREQ*0.002
+#define MIN_MOTOR				PIOSC_FREQ*0.001
+#define MOTOR1_POWER_OFFSET		0.1845f
+#define MOTOR2_POWER_OFFSET		0.1075f
+#define MOTOR3_POWER_OFFSET		0.2330f
+#define MOTOR4_POWER_OFFSET		0.1080f
 
 //----------------------------------------
 // PID data structure
 //----------------------------------------
 typedef struct PID
 {
+	const float Kp;
+	const float Ki;
+	const float Kd;
+
 	float ITerm;
+	const float ILimit;
 	float DTerm;
 
 	float in;
@@ -61,21 +44,28 @@ typedef struct PID
 	float error;
 } PID;
 
-struct
+//----------------------------------------
+// Quadcopter control structure
+//----------------------------------------
+static struct
 {
-	bool motorsOn;
 	// Global motor throttle control
 	float throttle;
-	// Normalized moving direction in horizontal plane
+	// Moving direction vector in horizontal plane
 	float direction[2];
-	// Moving norm in horizontal plane
-	float norm;
-	// Minimal throttle or horizontal moving percentage to affect quadcopter's behavior
-	float deadzone;
-} QuadControl = {.motorsOn= true, .throttle = 0.25, .direction = {1, 0}, .norm = 0, .deadzone = 0.10};
+	// The orientation of quadricopter around z axis in radians
+	float yaw;
+	bool yawRegulationEnabled;
+	// Klaxon !
+	bool beep;
+	// Flag that must be raisezd if any problem occurs and motors must be stopped
+	bool ShutOffMotors;
+	// Boolean indicating wether if radio control is enabled.
+	bool RadioControlEnabled;
+} QuadControl = {.RadioControlEnabled = true};
 
 //----------------------------------------
-// Motor PWM control
+// Motor PWM control structure typedef
 //----------------------------------------
 typedef struct
 {

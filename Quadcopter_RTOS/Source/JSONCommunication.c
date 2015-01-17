@@ -175,7 +175,7 @@ JSONDataSource* SuscribeJSONDataSource(char* name, const char* keys[], uint32_t 
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesAccessor dataAccessor)
+JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
 {
 	// If there is no more available space in JSONDataSources array, we allocate more memory.
 	if (JSONDataSources.used == JSONDataSources.size)

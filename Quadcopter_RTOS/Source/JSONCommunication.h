@@ -15,7 +15,8 @@
 // Data accessor function typedef used to
 // get string data array from datasources.
 //----------------------------------------
-typedef char** (*DataValuesAccessor)(void);
+typedef char** (*DataValuesGetAccessor)(void);
+typedef void (*DataValuesSetAccessor)(char**);
 
 //------------------------------------------
 // A structure gathering informations about
@@ -35,7 +36,7 @@ typedef struct
 	bool enabled;
 	// Period of the data source data sending in RTOS clock ticks (0 means not periodic)
 	uint32_t period;
-	DataValuesAccessor dataAccessor;
+	DataValuesGetAccessor dataAccessor;
 	// Flag used to indicate to sending task that this data source need to send its data
 	bool sendNowFlag;
 } JSONDataSource;
@@ -71,7 +72,7 @@ JSONDataSource* SuscribeJSONDataSource(char* name,const char* keys[], uint32_t d
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesAccessor DataAccessor);
+JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
 
 //--------------------------------------------
 // Send data:

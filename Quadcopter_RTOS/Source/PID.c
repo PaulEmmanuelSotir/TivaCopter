@@ -4,7 +4,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 //----------------------------------------
 // BIOS header files
@@ -19,9 +21,10 @@
 #include "driverlib/rom_map.h"
 #include "driverlib/timer.h"
 
+#include "Math.h"
 #include "PinMap.h"
 #include "JSONCommunication.h"
-#include "Utils/conversion.h"
+#include "Utils/utils.h"
 #include "IMU.h"
 #include "PID.h"
 
@@ -33,12 +36,15 @@ extern InertialMeasurementUnit IMU;
 //----------------------------------------
 // Motor data structures
 //----------------------------------------
-Motor Motors[4];
+static Motor Motors[4];
 
 //----------------------------------------
 // PID data structures
+// TODO: determine PIDs gains
 //----------------------------------------
-PID YawPID, PitchPID, RollPID;
+static PID YawPID =		{ .Kp = 0.035,	.Ki = 0.035,	.Kd = 0.0,		.ILimit = 0.30};
+static PID PitchPID =	{ .Kp = 0.16,	.Ki = 0.48,		.Kd = 0.0004,	.ILimit = 1.20};//{ .Kp = 0.04,	.Ki = 0.12,		.Kd = 0.0001,	.ILimit = 0.30};
+static PID RollPID =	{ .Kp = 0.16,	.Ki = 0.48,		.Kd = 0.0004,	.ILimit = 1.20};//{ .Kp = 0.04,	.Ki = 0.12,		.Kd = 0.0001,	.ILimit = 0.30};
 
 //-----------------------------------------
 // String pointer array for PID data source
@@ -51,6 +57,14 @@ char* PIDStrPtrs[10] =  {	Motors[0].strPower, Motors[1].strPower, Motors[2].strP
 // Data received from radio
 //----------------------------------------
 char* RadioIn[5] = { "0", "0", "0", "0", "0" };
+static bool RadioInputUpdatedFlag = false;
+
+//------------------------------------------
+// Static function forward declarations
+//------------------------------------------
+static inline void ProcessPID(PID* pid);
+static void TurnOffMotors(void);
+static void MapRadioInputToQuadcopterControl(void);
 
 //----------------------------------------
 // GPIO Port E Hardware Interrupt (radio)
@@ -68,6 +82,8 @@ void GPIOPEHwi(void)
 	RadioIn[2] = data & RADIO_CH3_PIN ? "1" : "0";
 	RadioIn[3] = data & RADIO_CH4_PIN ? "1" : "0";
 	RadioIn[4] = data & RADIO_CH5_PIN ? "1" : "0";
+
+	RadioInputUpdatedFlag = true;
 }
 
 //----------------------------------------
@@ -100,16 +116,16 @@ char** PIDDataAccessor(void)
 	memset(Motors[3].strPower, '\0', sizeof(Motors[3].strPower));
 
 	// Convert float values to strings
-	ftoa(Motors[0].power , 	PIDStrPtrs[0], 4);
-	ftoa(Motors[1].power , 	PIDStrPtrs[1], 4);
-	ftoa(Motors[2].power , 	PIDStrPtrs[2], 4);
-	ftoa(Motors[3].power , 	PIDStrPtrs[3], 4);
-	ftoa(YawPID.in , 		PIDStrPtrs[4], 4);
-	ftoa(PitchPID.in , 		PIDStrPtrs[5], 4);
-	ftoa(RollPID.in , 		PIDStrPtrs[6], 4);
-	ftoa(YawPID.out , 		PIDStrPtrs[7], 4);
-	ftoa(PitchPID.out , 	PIDStrPtrs[8], 4);
-	ftoa(RollPID.out , 		PIDStrPtrs[9], 4);
+	ftoa(Motors[0].power, 	PIDStrPtrs[0], 4);
+	ftoa(Motors[1].power, 	PIDStrPtrs[1], 4);
+	ftoa(Motors[2].power, 	PIDStrPtrs[2], 4);
+	ftoa(Motors[3].power, 	PIDStrPtrs[3], 4);
+	ftoa(YawPID.in, 		PIDStrPtrs[4], 4);
+	ftoa(PitchPID.in, 		PIDStrPtrs[5], 4);
+	ftoa(RollPID.in, 		PIDStrPtrs[6], 4);
+	ftoa(YawPID.out, 		PIDStrPtrs[7], 4);
+	ftoa(PitchPID.out, 		PIDStrPtrs[8], 4);
+	ftoa(RollPID.out, 		PIDStrPtrs[9], 4);
 
 	return (char**)PIDStrPtrs;
 }
@@ -126,86 +142,157 @@ void PIDTask(void)
 	GPIOPEHwi();
 
 	// Suscribe a bluetooth datasource to send periodically PID's data
-	JSONDataSource* PIDds = SuscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
-																					"YawIn", "PitchIn", "RollIn",
-																					"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
+	JSONDataSource* PID_ds = SuscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
+																						"YawIn", "PitchIn", "RollIn",
+																						"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
 
 	// Suscribe a bluetooth datasource to send periodically Radio's data
-	JSONDataSource* Radiods = SuscribePeriodicJSONDataSource("radio", (const char*[]) {	"in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
+	JSONDataSource* Radio_ds = SuscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
 
 	while(1)
 	{
 		// TODO: savoir si il faudrais mettre ici un timout pour mettre la poussée des moteurs à 0.
 		Semaphore_pend(PID_Sem, BIOS_WAIT_FOREVER);
 
+		if(QuadControl.ShutOffMotors)
+		{
+			// Turn off motors if any problem occurs
+			TurnOffMotors();
+			return;
+		}
+
+		if(QuadControl.RadioControlEnabled && RadioInputUpdatedFlag)
+			MapRadioInputToQuadcopterControl();
+
+		// Map QuadControl to PIDs input
+		YawPID.in = QuadControl.yaw;
+		PitchPID.in = PI/4 * QuadControl.direction[x];
+		RollPID.in = PI/4 * QuadControl.direction[y];
+
 		// Get error using euler angles from IMU
-		YawPID.error = IMU.yaw - YawPID.in;
 		PitchPID.error = IMU.pitch - PitchPID.in;
 		RollPID.error = IMU.roll - RollPID.in;
 
-		// If error is very small, we omit this
-		if(YawPID.error < 0.0001 && YawPID.error > -0.0001)
-			YawPID.error = 0;
-		if(PitchPID.error < 0.0001 && PitchPID.error > -0.0001)
-			PitchPID.error = 0;
-		if(RollPID.error < 0.0001 && RollPID.error > -0.0001)
-			RollPID.error = 0;
+		ProcessPID(&PitchPID);
+		ProcessPID(&RollPID);
 
-		// Integrate data and apply saturation
-		YawPID.ITerm	+= 	YAW_KI		*	(YawPID.in + YawPID.lastIn)		*	(SAMPLE_PERIOD/2.0);
-		PitchPID.ITerm	+=	PITCH_KI	*	(PitchPID.in + PitchPID.lastIn)	*	(SAMPLE_PERIOD/2.0);
-		RollPID.ITerm	+= 	ROLL_KI		*	(RollPID.in + RollPID.lastIn)	*	(SAMPLE_PERIOD/2.0);
-		if(YawPID.ITerm > YAW_I_LIMIT)				YawPID.ITerm	= 	YAW_I_LIMIT;
-		else if(YawPID.ITerm < -YAW_I_LIMIT)		YawPID.ITerm	= 	-YAW_I_LIMIT;
-		if(PitchPID.ITerm > PITCH_I_LIMIT)			PitchPID.ITerm	= 	PITCH_I_LIMIT;
-		else if(PitchPID.ITerm < -PITCH_I_LIMIT)	PitchPID.ITerm	= 	-PITCH_I_LIMIT;
-		if(RollPID.ITerm > ROLL_I_LIMIT)			RollPID.ITerm	= 	ROLL_I_LIMIT;
-		else if(RollPID.ITerm < -ROLL_I_LIMIT)		RollPID.ITerm	= 	-ROLL_I_LIMIT;
+		// Convert euler angles to motors command
+		Motors[0].power =   PitchPID.out + RollPID.out + QuadControl.throttle;
+		Motors[1].power = - PitchPID.out + RollPID.out + QuadControl.throttle;
+		Motors[2].power = - PitchPID.out - RollPID.out + QuadControl.throttle;
+		Motors[3].power =   PitchPID.out - RollPID.out + QuadControl.throttle;
 
-		// Derivate data
-		YawPID.DTerm	= 	YAW_KD		*	(YawPID.in - YawPID.lastIn)		*	SAMPLE_FREQ;
-		PitchPID.DTerm	=	PITCH_KD	*	(PitchPID.in - PitchPID.lastIn)	*	SAMPLE_FREQ;
-		RollPID.DTerm	= 	ROLL_KD		*	(RollPID.in - RollPID.lastIn)	*	SAMPLE_FREQ;
-
-		// Sum each PID terms
-		YawPID.out 		= (YAW_KP * YawPID.error) 		+ 	YawPID.ITerm 	+ 	YawPID.DTerm;
-		PitchPID.out	= (PITCH_KP * PitchPID.error) 	+	PitchPID.ITerm 	+ 	PitchPID.DTerm;
-		RollPID.out 	= (ROLL_KP * RollPID.error) 	+ 	RollPID.ITerm 	+ 	RollPID.DTerm;
-
-		// Update last PID inputs
-		YawPID.lastIn 	= YawPID.in;
-		PitchPID.lastIn = PitchPID.in;
-		RollPID.lastIn 	= RollPID.in;
-
-		if(QuadControl.motorsOn)
+		if(QuadControl.yawRegulationEnabled)
 		{
-			// Convert euler angles to motors command
-			Motors[0].power = - YawPID.out + PitchPID.out + RollPID.out + QuadControl.throttle;
-			Motors[1].power =   YawPID.out - PitchPID.out + RollPID.out + QuadControl.throttle;
-			Motors[2].power = - YawPID.out - PitchPID.out - RollPID.out + QuadControl.throttle;
-			Motors[3].power =   YawPID.out + PitchPID.out - RollPID.out + QuadControl.throttle;
+			YawPID.error = IMU.yaw - YawPID.in;
+			ProcessPID(&YawPID);
+			Motors[0].power -= YawPID.out;
+			Motors[1].power += YawPID.out;
+			Motors[2].power -= YawPID.out;
+			Motors[3].power += YawPID.out;
+		}
 
-			// Limit output to its range (saturation)
-			uint32_t i;
-			for(i = 0; i < 4; ++i)
-			{
-				if(Motors[i].power > 1.0f) Motors[i].power = 1.0f;
-				if(Motors[i].power < 0.0f) Motors[i].power = 0.0f;
-			}
-		}
-		else
-		{
-			// Motors off
-			Motors[0].power = 0;
-			Motors[1].power = 0;
-			Motors[2].power = 0;
-			Motors[3].power = 0;
-		}
+		// Limit motors power to its range
+		U_SAT(Motors[0].power, 1.0f);
+		U_SAT(Motors[1].power, 1.0f);
+		U_SAT(Motors[2].power, 1.0f);
+		U_SAT(Motors[3].power, 1.0f);
+
+		// Map motors power into their real range (from measured minimum power to start each motors)
+		Motors[0].power = Motors[0].power * (1.0f-MOTOR1_POWER_OFFSET) + MOTOR1_POWER_OFFSET;
+		Motors[1].power = Motors[1].power * (1.0f-MOTOR2_POWER_OFFSET) + MOTOR2_POWER_OFFSET;
+		Motors[2].power = Motors[2].power * (1.0f-MOTOR3_POWER_OFFSET) + MOTOR3_POWER_OFFSET;
+		Motors[3].power = Motors[3].power * (1.0f-MOTOR4_POWER_OFFSET) + MOTOR4_POWER_OFFSET;
 
 		// Update PWM control of ESCs
-		TimerMatchSet(TIMER2_BASE, TIMER_A, (Motors[0].power * (MAX_MOTOR - MIN_MOTOR))	+	MIN_MOTOR);
-		TimerMatchSet(TIMER2_BASE, TIMER_B, (Motors[1].power * (MAX_MOTOR - MIN_MOTOR))	+	MIN_MOTOR);
-		TimerMatchSet(TIMER3_BASE, TIMER_A, (Motors[2].power * (MAX_MOTOR - MIN_MOTOR))	+	MIN_MOTOR);
-		TimerMatchSet(TIMER3_BASE, TIMER_B, (Motors[3].power * (MAX_MOTOR - MIN_MOTOR))	+	MIN_MOTOR);
+		TimerMatchSet(TIMER2_BASE, TIMER_A, (Motors[0].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
+		TimerMatchSet(TIMER2_BASE, TIMER_B, (Motors[1].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
+		TimerMatchSet(TIMER3_BASE, TIMER_A, (Motors[2].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
+		TimerMatchSet(TIMER3_BASE, TIMER_B, (Motors[3].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
 	}
+}
+
+//----------------------------------------
+// Process PID:
+// Process given PID structure's output
+// from its error and input.
+// Uses SAMPLE_FREQ to integrate and
+// derive data.
+// TODO: savoir si ce inline est utile
+//----------------------------------------
+static inline void ProcessPID(PID* pid)
+{
+	// If error is very small, we omit this
+	if((*pid).error < 0.0001 && (*pid).error > -0.0001)
+		(*pid).error = 0;
+
+	// Integrate data and apply saturation
+	(*pid).ITerm += (*pid).Ki * ((*pid).in + (*pid).lastIn) * (SAMPLE_PERIOD/2.0);
+	SAT((*pid).ITerm, (*pid).ILimit);
+
+	// Derivate data
+	(*pid).DTerm = (*pid).Kd * ((*pid).in - (*pid).lastIn) * SAMPLE_FREQ;
+
+	// Sum each PID terms
+	(*pid).out = ((*pid).Kp * (*pid).error) + (*pid).ITerm + (*pid).DTerm;
+
+	// Update last PID inputs
+	(*pid).lastIn = (*pid).in;
+}
+
+//----------------------------------------
+// Turn off motors
+//----------------------------------------
+static void TurnOffMotors(void)
+{
+	TimerMatchSet(TIMER2_BASE, TIMER_A, MIN_MOTOR);
+	TimerMatchSet(TIMER2_BASE, TIMER_B, MIN_MOTOR);
+	TimerMatchSet(TIMER3_BASE, TIMER_A, MIN_MOTOR);
+	TimerMatchSet(TIMER3_BASE, TIMER_B, MIN_MOTOR);
+}
+
+//----------------------------------------
+// Map radio input to quadcopter control
+// TODO: find a safer and handy way to
+// control quadcopter via 5CHs radio!
+//----------------------------------------
+static void MapRadioInputToQuadcopterControl(void)
+{
+	if(RadioIn[0] == "1")
+	{
+		QuadControl.throttle += 0.01;
+		U_SAT(QuadControl.throttle, 1.0f);
+	}
+	else
+		QuadControl.throttle = 0;
+
+	if(RadioIn[1] == "1")
+	{
+		QuadControl.direction[x] += 0.01;
+		SAT(QuadControl.direction[x], 1.0f);
+	}
+	else if(RadioIn[2] == "1")
+	{
+		QuadControl.direction[x] -= 0.01;
+		SAT(QuadControl.throttle, 1.0f);
+	}
+	else
+		QuadControl.direction[x] = 0;
+
+	if(RadioIn[3] == "1")
+	{
+		QuadControl.direction[y] += 0.01;
+		SAT(QuadControl.throttle, 1.0f);
+	}
+	else if(RadioIn[4] == "1")
+	{
+		QuadControl.direction[y] -= 0.01;
+		SAT(QuadControl.throttle, 1.0f);
+	}
+	else
+		QuadControl.direction[y] = 0;
+
+	// When we control quadcopter by radio, the quadcopter orientation is always ahead
+	QuadControl.yaw = atan2(QuadControl.direction[y], QuadControl.direction[x]);
+
 }
