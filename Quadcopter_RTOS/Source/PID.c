@@ -150,10 +150,8 @@ void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 	TivacopterControl.yaw = atof(RemoteCtrlKeys[3]);
 	U_SAT(TivacopterControl.yaw, 1.0f);
 
-	TivacopterControl.beep = 't' == tolower(RemoteCtrlKeys[4][0])
-					&& 'r' == tolower(RemoteCtrlKeys[4][1])
-					&& 'u' == tolower(RemoteCtrlKeys[4][2])
-					&& 'e' == tolower(RemoteCtrlKeys[4][3]);
+	TivacopterControl.beep = ('1' == RemoteCtrlKeys[4][0]);
+	beep(TivacopterControl.beep);
 }
 
 //----------------------------------------

@@ -106,12 +106,23 @@ void UART3IntHandler(void)
 }
 
 //------------------------------------------
+// Beeper state control
+//------------------------------------------
+void beep(bool state)
+{
+	if(state)
+		MAP_GPIOPinWrite(BUZZER_PORT, BUZZER_PIN, BUZZER_PIN);
+	else
+		MAP_GPIOPinWrite(BUZZER_PORT, BUZZER_PIN, 0x00);
+}
+
+//------------------------------------------
 // Battery level periodic interrupt.
 // TODO: le faire >.<
 //------------------------------------------
 void BatteryLevelSwi(void)
 {
-	static bool beep = false;
+	static bool beepState = false;
 	static uint8_t cool = 0x00;
 
 	int32_t batteryLvl = -1;
@@ -149,19 +160,12 @@ void BatteryLevelSwi(void)
 	}
 	else if(batteryLvl < MIN_BATTERY_LVL)
 	{
-		if(beep)
-			MAP_GPIOPinWrite(BUZZER_PORT, BUZZER_PIN, BUZZER_PIN);
-		else
-			MAP_GPIOPinWrite(BUZZER_PORT, BUZZER_PIN, 0x00);
-
-		beep = !beep;
+		beep(beepState);
+		beepState = !beepState;
 	}
 	else
-		MAP_GPIOPinWrite(BUZZER_PORT, BUZZER_PIN, 0x00);
+		beep(false);
 }
-
-
-
 
 /*
  * GPIOPK_Hwi :
