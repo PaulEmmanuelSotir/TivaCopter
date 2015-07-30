@@ -24,6 +24,10 @@
 
 //------------------------------------------
 // PortFunctionInit
+// TODO: configure all unused pins as
+// outputs so they are not floating. (they
+// may pick up noise and toggle at a high
+// frequency).
 //------------------------------------------
 void PortFunctionInit()
 {
