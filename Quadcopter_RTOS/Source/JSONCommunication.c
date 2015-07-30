@@ -20,6 +20,7 @@
 #include <ti/sysbios/knl/Queue.h>
 
 #include "inc/tm4c1294ncpdt.h"
+#include "driverlib/debug.h"
 #include "driverlib/rom_map.h"
 #include "driverlib/uart.h"
 #include "driverlib/rom.h"
@@ -83,21 +84,28 @@ void JSON_list_sources_cmd(int argc, char *argv[])
 //----------------------------------------
 void JSON_enable_cmd(int argc, char *argv[])
 {
-	if(checkArgCount(&Console, argc, 2))
+	if(argc > 1)
 	{
-		int i = JSONDataSources.used;
-		while(i--)
+		while(--argc)
 		{
-			if(strcmp(JSONDataSources.array[i].name, argv[1]) == 0)
+			int32_t ds_idx = JSONDataSources.used;
+			while(ds_idx--)
 			{
-				JSONDataSources.array[i].enabled = true;
-				UARTwrite(&Console, "JSON data source enabled.", 25);
-				return;
+				if(strcmp(JSONDataSources.array[ds_idx].name, argv[argc]) == 0)
+				{
+					JSONDataSources.array[ds_idx].enabled = true;
+					UARTprintf(&Console, "'%s' JSON data source enabled.\n", argv[argc]);
+					break;
+				}
 			}
+
+			if(ds_idx < 0)
+				UARTprintf(&Console, "Wrong JSON data source name ('%s')\n", argv[argc]);
 		}
 
-		UARTwrite(&Console, "Wrong JSON data source name.", 28);
 	}
+	else
+		UARTwrite(&Console, "Too few arguments.", 18);
 }
 
 //----------------------------------------
@@ -106,21 +114,27 @@ void JSON_enable_cmd(int argc, char *argv[])
 //----------------------------------------
 void JSON_disable_cmd(int argc, char *argv[])
 {
-	if(checkArgCount(&Console, argc, 2))
+	if(argc > 1)
 	{
-		int i = JSONDataSources.used;
-		while(i--)
+		while(--argc)
 		{
-			if(strcmp(JSONDataSources.array[i].name, argv[1]) == 0)
+			int32_t ds_idx = JSONDataSources.used;
+			while(ds_idx--)
 			{
-				JSONDataSources.array[i].enabled = false;
-				UARTwrite(&Console, "JSON data source disabled.", 26);
-				return;
+				if(strcmp(JSONDataSources.array[ds_idx].name, argv[argc]) == 0)
+				{
+					JSONDataSources.array[ds_idx].enabled = false;
+					UARTprintf(&Console, "'%s' JSON data source disabled.\n", argv[argc]);
+					break;
+				}
 			}
-		}
 
-		UARTwrite(&Console, "Wrong JSON data source name.", 28);
+			if(ds_idx < 0)
+				UARTprintf(&Console, "Wrong JSON data source name ('%s')\n", argv[argc]);
+		}
 	}
+	else
+		UARTwrite(&Console, "Too few arguments.", 18);
 }
 
 //----------------------------------------
