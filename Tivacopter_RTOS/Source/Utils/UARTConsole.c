@@ -211,6 +211,43 @@ bool checkArgCount(UARTConsole* console, int argc, int expected)
 	return true;
 }
 
+//---------------------------------------------------------------------------
+// Check argument range:
+// This function must be called by user if argument count verification is
+// needed (arg count between a maximum and minimal value).
+//---------------------------------------------------------------------------
+bool checkArgRange(UARTConsole* console, int argc, int minExpected, int maxExpected)
+{
+	if(minExpected > argc)
+	{
+		UARTwrite(console, "Too few arguments.", 18);
+		return false;
+	}
+	else if(maxExpected < argc)
+	{
+		UARTwrite(console, "Too many arguments.", 19);
+		return false;
+	}
+
+	return true;
+}
+
+//---------------------------------------------------------------------------
+// Check minimal argument count:
+// This function must be called by user if argument count verification is
+// needed (arg count must be at least 'minExpected').
+//---------------------------------------------------------------------------
+bool checkMinimalArgCount(UARTConsole* console, int argc, int minExpected)
+{
+	if(minExpected > argc)
+	{
+		UARTwrite(console, "Too few arguments.", 18);
+		return false;
+	}
+
+	return true;
+}
+
 //----------------------------------------------------------------------------
 // Disable command line interface:
 // This function is used to disable command line interface so that application
@@ -236,7 +273,7 @@ void EnableCmdLineInterface(UARTConsole* console)
 		console->CurrentlyRunningCmd = NULL;
 		UARTFlushTx(console, true);
 		UARTFlushRx(console);
-		UARTwrite(console, "\n> ", 3);
+		UARTwrite(console, "\nTivacopter> ", 13);
 		console->CmdLineInterfaceDisabled = false;
 	}
 
@@ -1175,7 +1212,7 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
                 // The maximum number of arguments has been reached so send the error and return.
                 else
                 {
-                	UARTwrite(console, "Too many arguments.\n> ", 22);
+                	UARTwrite(console, "Too many arguments.\nTivacopter> ", 32);
                 	return;
                 }
             }
@@ -1200,7 +1237,7 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
     		{
     			UARTprintf(console, " - %s:		%s\n", console->CmdTable.array[cntr].name, console->CmdTable.array[cntr].help);
     		}
-    		UARTwrite(console, "\n> ", 3);
+    		UARTwrite(console, "\nTivacopter> ", 13);
     		return;
     	}
 
@@ -1220,7 +1257,7 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
     			// If cmd app didn't disabled command line interface, we ask user for entering a new command ('> ')
     			if(!console->CmdLineInterfaceDisabled)
     			{
-    				UARTwrite(console, "\n\n> ", 4);
+    				UARTwrite(console, "\n\nTivacopter> ", 14);
         			console->CurrentlyRunningCmd = NULL;
     			}
 
@@ -1233,6 +1270,6 @@ static void CmdLineProcess(UARTConsole* console, char *input, uint32_t length)
     }
 
     // Fall through to here means that no matching command was found, so send an error.
-    UARTwrite(console, "Bad command.\n> ", 15);
+    UARTwrite(console, "Bad command.\nTivacopter> ", 25);
 }
 

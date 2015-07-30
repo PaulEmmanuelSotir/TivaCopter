@@ -21,13 +21,17 @@ const static I2CTransaction DEFAULT_I2C_TRANSACTION = { I2C0_BASE, TRANSAC_DIR_R
 // Variables handled by 'NextTransac()', 'AddTransac()' and 'WaitTransac()' functions:
 // These variables shouldn't be modified anywhere else.
 // > 'CurrentTransac' can be read but not modified.
-// > Do not even read 'LastTransac' and 'AllocatedTransactionNumber'
+// > Do not even read 'LastTransac' and 'QueuedTransactionNumber'
 // > TRANSACTION_SIZE is approx. 36 bytes.
 //------------------------------------------------------------------------------------
 static I2CTransaction*	CurrentTransac 				= NULL;
 static I2CTransaction* 	LastTransac 				= NULL;
-static uint32_t			AllocatedTransactionNumber	= 0;
 static const uint32_t	TRANSACTION_SIZE 			= sizeof(struct I2CTransaction);
+static uint32_t QueuedTransactionNumber = 0;
+#ifndef DYNAMIC_I2C_TRANSACTION_API
+static I2CTransaction TransactionsQueue[MAX_QUEUEING_TRANSACTIONS]; // Static transactions array
+static uint32_t LastTransacIdx = MAX_QUEUEING_TRANSACTIONS-1;
+#endif
 
 //-------------------------------------------
 // User defined lock and unlock functions
@@ -296,7 +300,7 @@ void Async_I2CWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint8_t *data, uin
 {
 	intptr_t lock = I2CTransactionsLock();
 
-	// Allocate a new transaction
+	// Create a new transaction
 	I2CTransaction *newTransac = AddTransac();
 
 	newTransac->I2CBase = I2C_Base;
@@ -323,7 +327,7 @@ void Async_I2CRegWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t regist
 {
 	intptr_t lock = I2CTransactionsLock();
 
-	// Allocate a new transaction
+	// Create a new transaction
 	I2CTransaction *newTransac = AddTransac();
 
 	newTransac->I2CBase = I2C_Base;
@@ -349,7 +353,7 @@ void Async_I2CRegRead(uint32_t I2C_Base, uint32_t slaveAddress, uint32_t registe
 {
 	intptr_t lock = I2CTransactionsLock();
 
-	// Allocate a new transaction
+	// Create a new transaction
 	I2CTransaction *newTransac = AddTransac();
 
 	newTransac->I2CBase = I2C_Base;
@@ -376,7 +380,7 @@ void Async_I2CRegReadModifyWrite(uint32_t I2C_Base, uint32_t slaveAddress, uint3
 {
 	intptr_t lock = I2CTransactionsLock();
 
-	// Allocate a new transaction
+	// Create a new transaction
 	I2CTransaction *newTransac = AddTransac();
 
 	newTransac->I2CBase = I2C_Base;
@@ -445,17 +449,17 @@ uint32_t WaitI2CTransacs(uint32_t timeout)
 }
 
 //--------------------------------------------
-// Dynamically allocate a new I2C transaction.
+// Creates a new I2C transaction.
 //--------------------------------------------
 static I2CTransaction* AddTransac(void)
 {
 	// Check if the transaction number isn't too high. (free all transactions if so)
-	if(++AllocatedTransactionNumber > MAX_QUEUEING_TRANSACTIONS)
+	if(++QueuedTransactionNumber > MAX_QUEUEING_TRANSACTIONS)
 	{
 		I2CTxFIFOFlush(CurrentTransac->I2CBase);
 		I2CRxFIFOFlush(CurrentTransac->I2CBase);
 
-		// Free all queued transaction so that new ones can be executed
+		// Free/Forget all queued transaction so that new ones can be executed
 		while(CurrentTransac != NULL)
 		{
 			// Call old transaction's user-defined callback with appropriate error code.
@@ -464,23 +468,33 @@ static I2CTransaction* AddTransac(void)
 
 			NextTransac();
 		}
-		// As an error in transaction queue may occur, make sure that 'AllocatedTransactionNumber' is 1 anyway for the next
+		// As an error in transaction queue may occur, make sure that 'QueuedTransactionNumber' is 1 anyway for the next
 		// transaction that will be created at the end of this function. (bad for heap if any error of that kind occurs)
-		AllocatedTransactionNumber = 1;
+		QueuedTransactionNumber = 1;
+#ifndef DYNAMIC_I2C_TRANSACTION_API
+
+#endif
 	}
 
 	// Store Last transaction
 	I2CTransaction* previousTransac = LastTransac;
 
+#ifndef DYNAMIC_I2C_TRANSACTION_API
+	// Statically get a new I2C transaction
+	LastTransacIdx = (LastTransacIdx+1) % MAX_QUEUEING_TRANSACTIONS;
+	LastTransac = &TransactionsQueue[LastTransacIdx];
+	memcpy(LastTransac, &DEFAULT_I2C_TRANSACTION, TRANSACTION_SIZE);
+#else
 	// Dynamicaly create a new I2C transaction
 	LastTransac = (I2CTransaction *)malloc(TRANSACTION_SIZE);
 	if(LastTransac != NULL)
 		memcpy(LastTransac, &DEFAULT_I2C_TRANSACTION, TRANSACTION_SIZE);
 	else
-		--AllocatedTransactionNumber;
+		--QueuedTransactionNumber;
+#endif
 
 	if(previousTransac == NULL)
-		// The new transaction is the only transaction <=> previousTransac == NULL <=> CurrentTransac == NULL <=> AllocatedTransactionNumber = 1
+		// The new transaction is the only transaction <=> previousTransac == NULL <=> CurrentTransac == NULL <=> QueuedTransactionNumber = 1
 		CurrentTransac = LastTransac;
 	else
 		// Append transation to the I2C transaction queue.
@@ -500,7 +514,12 @@ static void NextTransac(void)
 	{
 		I2CTransaction* nextTransaction = CurrentTransac->NextTransaction;
 
+#ifdef DYNAMIC_I2C_TRANSACTION_API
 		free(CurrentTransac);
+#else
+		CurrentTransac->NextTransaction = NULL;
+		LastTransacIdx = (MAX_QUEUEING_TRANSACTIONS + LastTransacIdx - 1) % MAX_QUEUEING_TRANSACTIONS;
+#endif
 
         if(nextTransaction == NULL)
         {
@@ -509,7 +528,6 @@ static void NextTransac(void)
         }
         else
         	CurrentTransac = nextTransaction;
-
-		AllocatedTransactionNumber--;
+        QueuedTransactionNumber--;
 	}
 }

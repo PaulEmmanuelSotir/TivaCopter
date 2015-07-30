@@ -1,3 +1,4 @@
+#File used to help "Clean Project" in CCS completely clean the kernel files
 CFG_SRCDIR = ../src
 
 ifneq (,$(findstring :,$(WINDIR)$(windir)$(COMSPEC)$(comspec)))
@@ -17,7 +18,7 @@ $(CFG_SRCDIR)/makefile.libs: $(GEN_OPTS) $(CFG_SRCS)
 endif
 
 #add generated makefile to list of files to delete during a clean
-#GEN_MISC_FILES__QTD += "$(CFG_SRCDIR)/makefile.libs" 
+#GEN_MISC_FILES__QTD += "$(CFG_SRCDIR)/makefile.libs"
 
 #add generated source dir to list of directories to delete during a clean
 #GEN_MISC_DIRS__QTD += "$(CFG_SRCDIR)"

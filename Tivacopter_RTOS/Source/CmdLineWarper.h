@@ -1,7 +1,5 @@
 /*
  * CmdLineWarper.h
- *
- *  Created on: 12 sept. 2014
  */
 
 #ifndef CMDLINEWARPER_H_

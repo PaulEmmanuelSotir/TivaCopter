@@ -26,12 +26,12 @@
 //----------------------------------------
 typedef struct PID
 {
-	const float Kp;
-	const float Ki;
-	const float Kd;
+	float Kp;
+	float Ki;
+	float Kd;
 
 	float ITerm;
-	const float ILimit;
+	float ILimit;
 	float DTerm;
 
 	float in;
@@ -50,18 +50,20 @@ typedef struct PID
 typedef struct
 {
 	// Global motor throttle control
-	float throttle;
+	float Throttle;
 	// Moving direction vector in horizontal plane
-	float direction[2];
+	float Direction[2];
 	// The orientation of quadricopter around z axis in radians
-	float yaw;
-	bool yawRegulationEnabled;
+	float Yaw;
+	bool YawRegulationEnabled;
 	// Klaxon !
-	bool beep;
+	bool Beep;
 	// Flag that must be raisezd if any problem occurs and motors must be stopped
 	bool ShutOffMotors;
 	// Boolean indicating wether if radio control is enabled.
 	bool RadioControlEnabled;
+	// Altitiude stabilization
+	bool AltitudeStabilizationEnabled;
 }QuadControl;
 
 //----------------------------------------

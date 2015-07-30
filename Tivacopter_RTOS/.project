@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>Quadcopter_RTOS</name>
+	<name>Tivacopter_RTOS</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -25,10 +25,4 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
-	<variableList>
-		<variable>
-			<name>TW_ROOT</name>
-			<value>file:/C:/ti/tirtos_tivac_2_10_01_38/products/TivaWare_C_Series-2.1.0.12573c</value>
-		</variable>
-	</variableList>
 </projectDescription>

@@ -7,6 +7,7 @@
  *   from a task unblocked(semaphore) by an I2C Hwi and with a higher priority than tasks
  *   that request readings (calling Async_I2CWrite, Async_I2CRegWrite or Async_I2CRegRead).
  * > 'Async_I2CRegRead', 'Async_I2CWrite', 'Async_I2CRegWrite' and 'WaitTransac'
+ * TODO: ajouter un define pour utiliser l'API sans allocations dynamiques
  */
 
 #ifndef I2C_REG_TRANSACTION_H_

@@ -90,21 +90,6 @@ static void WriteTransactionCallback(uint32_t status, uint8_t* buffer, uint32_t 
 	EnableCmdLineInterface(&Console);
 }
 
-//----------------------------------------
-// Subscribe warper cmds
-//----------------------------------------
-void SubscribeWarperCmds(void)
-{
-	void CheckSuccess(bool success);
-
-	// I2C transaction API to UART command line interface warper
-	CheckSuccess(SubscribeCmd(&Console, "i2cSelect", 	I2CSelect_cmd, 			"Detrmines which I2C peripheral will be used for next i2c command calls (Default is IMU_I2C_BASE). e.g. \"i2cSelect 3\""));
-	CheckSuccess(SubscribeCmd(&Console, "i2cregr", 	I2CRegRead_cmd, 		"Performs an asynchronous I2C register read operation. First argument is slave decimal address, second one is the first I2C register decimal address and the last one is the number of bytes to be read."));
-	CheckSuccess(SubscribeCmd(&Console, "i2cregw", 	I2CRegWrite_cmd, 		"Performs an asynchronous I2C register write operation. First argument is slave decimal address, second one is the I2C register decimal address and the other ones are bytes to be writen in decimal format."));
-	CheckSuccess(SubscribeCmd(&Console, "i2cregrmw", 	I2CRegReadModifyWrite, 	"Performs an asynchronous I2C register read-modify-write operation. First argument is slave decimal address, second one is the first I2C register decimal address, the third one is the decimal bit mask and the last one is the decimal value."));
-	CheckSuccess(SubscribeCmd(&Console, "i2cw", 		I2CWrite_cmd, 			"Performs an asynchronous I2C write operation. First argument is slave decimal address and the other ones are bytes to be writen in decimal format."));
-}
-
 static void CheckSuccess(bool success)
 {
 	if(!success)
@@ -112,6 +97,19 @@ static void CheckSuccess(bool success)
 		Log_error0("Error (re)allocating memory for UART console Warper commands.");
 		ASSERT(FALSE);
 	}
+}
+
+//----------------------------------------
+// Subscribe warper cmds
+//----------------------------------------
+void SubscribeWarperCmds(void)
+{
+	// I2C transaction API to UART command line interface warper
+	CheckSuccess(SubscribeCmd(&Console, "i2cSelect", 	I2CSelect_cmd, 			"Detrmines which I2C peripheral will be used for next i2c command calls (Default is IMU_I2C_BASE). e.g. \"i2cSelect 3\""));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregr", 		I2CRegRead_cmd, 		"Performs an asynchronous I2C register read operation. First argument is slave decimal address, second one is the first I2C register decimal address and the last one is the number of bytes to be read."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregw", 		I2CRegWrite_cmd, 		"Performs an asynchronous I2C register write operation. First argument is slave decimal address, second one is the I2C register decimal address and the other ones are bytes to be writen in decimal format."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregrmw", 	I2CRegReadModifyWrite, 	"Performs an asynchronous I2C register read-modify-write operation. First argument is slave decimal address, second one is the first I2C register decimal address, the third one is the decimal bit mask and the last one is the decimal value."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cw", 		I2CWrite_cmd, 			"Performs an asynchronous I2C write operation. First argument is slave decimal address and the other ones are bytes to be writen in decimal format."));
 }
 
 //------------------------------------------
@@ -159,29 +157,25 @@ void I2CRegRead_cmd(int argc, char *argv[])
 //------------------------------------------
 void I2CRegWrite_cmd(int argc, char *argv[])
 {
-	if(argc > 3)
+	if(checkArgRange(&Console, argc, 3, 13))
 	{
 		// TODO: verifier que ce sont bien des chiffre (sinon 'atoi' renvoi 0 !!)
 		uint32_t SlaveAddress = atoi(argv[1]);
 		uint32_t RegisterAddress = atoi(argv[2]);
 		uint32_t ByteCount = argc-3;
 
-		if(ByteCount <= 10)
-		{
-			DisableCmdLineInterface(&Console);
+		DisableCmdLineInterface(&Console);
 
-			// Copy argument data bytes to I2C buffer
-			uint32_t i;
-			for(i = 0, argv += 3; i < ByteCount; ++i)
-				I2CBuffer[i] = atoi(argv[i]);
+		// Copy argument data bytes to I2C buffer
+		uint32_t i;
+		for(i = 0, argv += 3; i < ByteCount; ++i)
+			I2CBuffer[i] = atoi(argv[i]);
 
-			Async_I2CRegWrite(SelectedI2CBase, SlaveAddress, RegisterAddress, I2CBuffer, ByteCount, WriteTransactionCallback);
-		}
-		else
-			UARTwrite(&Console, "Can't write more than 10 bytes at once from command line interface.", 67);
+		Async_I2CRegWrite(SelectedI2CBase, SlaveAddress, RegisterAddress, I2CBuffer, ByteCount, WriteTransactionCallback);
+
 	}
-	else
-		UARTwrite(&Console, "Too few arguments.", 18);
+	else if(argc > 13)
+		UARTwrite(&Console, "Can't write more than 10 bytes at once from command line interface.", 67);
 }
 
 //------------------------------------------
@@ -208,27 +202,21 @@ void I2CRegReadModifyWrite(int argc, char *argv[])
 //------------------------------------------
 void I2CWrite_cmd(int argc, char *argv[])
 {
-	if(argc > 2)
+	if(checkArgRange(&Console, argc, 2, 12))
 	{
 		// TODO: verifier que ce sont bien des chiffre (sinon 'atoi' renvoi 0 !!)
 		uint32_t SlaveAddress = atoi(argv[1]);
 		uint32_t ByteCount = argc-2;
 
-		if(ByteCount <= 10)
-		{
-			DisableCmdLineInterface(&Console);
+		DisableCmdLineInterface(&Console);
 
-			// Copy argument data bytes to I2C buffer
-			uint32_t i;
-			for(i = 0, argv += 2; i < ByteCount; ++i)
-				I2CBuffer[i] = atoi(argv[i]);
+		// Copy argument data bytes to I2C buffer
+		uint32_t i;
+		for(i = 0, argv += 2; i < ByteCount; ++i)
+			I2CBuffer[i] = atoi(argv[i]);
 
-			Async_I2CWrite(SelectedI2CBase, SlaveAddress, I2CBuffer, ByteCount, WriteTransactionCallback);
-		}
-		else
-			UARTwrite(&Console, "Can't write more than 10 bytes at once from command line interface.", 67);
+		Async_I2CWrite(SelectedI2CBase, SlaveAddress, I2CBuffer, ByteCount, WriteTransactionCallback);
 	}
-	else
-		UARTwrite(&Console, "Too few arguments.", 18);
+	else if(argc > 12)
+		UARTwrite(&Console, "Can't write more than 10 bytes at once from command line interface.", 67);
 }
-

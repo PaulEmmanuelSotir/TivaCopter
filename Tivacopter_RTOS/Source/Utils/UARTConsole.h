@@ -149,6 +149,20 @@ bool SubscribeListeningCmd(UARTConsole* console, const char* name, CmdApp app, c
 //---------------------------------------------------------------------------
 bool checkArgCount(UARTConsole* console, int argc, int expected);
 
+//---------------------------------------------------------------------------
+// Check argument range:
+// This function must be called by user if argument count verification is
+// needed (arg count between a maximum and minimal value).
+//---------------------------------------------------------------------------
+bool checkArgRange(UARTConsole* console, int argc, int minExpected, int maxExpected);
+
+//---------------------------------------------------------------------------
+// Check minimal argument count:
+// This function must be called by user if argument count verification is
+// needed (arg count must be at least 'minExpected').
+//---------------------------------------------------------------------------
+bool checkMinimalArgCount(UARTConsole* console, int argc, int minExpected);
+
 //----------------------------------------------------------------------------
 // Is abort requested:
 // Indicates wether if current command execution need to be aborted.

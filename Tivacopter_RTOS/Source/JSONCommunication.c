@@ -473,7 +473,7 @@ void PeriodicJSONDataSendingTask(void)
 //-----------------------------------------
 // Periodic data sending software interrupt
 //-----------------------------------------
-static void PeriodicJSONDataSendingSwi(UArg dataSource)
+void PeriodicJSONDataSendingSwi(UArg dataSource)
 {
 	if(IsAbortRequested(&Console))
 	{

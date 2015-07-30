@@ -18,6 +18,7 @@
 
 #include "inc/tm4c1294ncpdt.h"
 #include "driverlib/gpio.h"
+#include "driverlib/debug.h"
 #include "driverlib/rom_map.h"
 #include "driverlib/timer.h"
 
@@ -34,10 +35,20 @@
 extern InertialMeasurementUnit IMU;
 
 //----------------------------------------
+// UART console from 'main.c'
+//----------------------------------------
+extern UARTConsole Console;
+
+//------------------------------------------
+// Beeper state control from 'main.c'
+//------------------------------------------
+extern void beep(bool state);
+
+//----------------------------------------
 // Motor data structures
 //----------------------------------------
 static Motor Motors[4];
-static QuadControl TivacopterControl = {.RadioControlEnabled = true};
+static QuadControl TivacopterControl = {.RadioControlEnabled = true, .AltitudeStabilizationEnabled = true};
 
 //----------------------------------------
 // PID data structures
@@ -46,13 +57,14 @@ static QuadControl TivacopterControl = {.RadioControlEnabled = true};
 static PID YawPID =		{ .Kp = 0.035,	.Ki = 0.035,	.Kd = 0.0,		.ILimit = 0.30};
 static PID PitchPID =	{ .Kp = 0.16,	.Ki = 0.48,		.Kd = 0.0004,	.ILimit = 1.20};//{ .Kp = 0.04,	.Ki = 0.12,		.Kd = 0.0001,	.ILimit = 0.30};
 static PID RollPID =	{ .Kp = 0.16,	.Ki = 0.48,		.Kd = 0.0004,	.ILimit = 1.20};//{ .Kp = 0.04,	.Ki = 0.12,		.Kd = 0.0001,	.ILimit = 0.30};
+static PID AltitudePID ={ .Kp = 0.035,	.Ki = 0.035,	.Kd = 0.0,		.ILimit = 0.3};
 
 //-----------------------------------------
 // String pointer array for PID data source
 //-----------------------------------------
-char* PIDStrPtrs[10] =  {	Motors[0].strPower, Motors[1].strPower, Motors[2].strPower, Motors[3].strPower,
-							YawPID.strIn, PitchPID.strIn, RollPID.strIn,
-							YawPID.strOut, PitchPID.strOut, RollPID.strOut	};
+char* PIDStrPtrs[12] =  {	Motors[0].strPower, Motors[1].strPower, Motors[2].strPower, Motors[3].strPower,
+							YawPID.strIn, PitchPID.strIn, RollPID.strIn, AltitudePID.strIn,
+							YawPID.strOut, PitchPID.strOut, RollPID.strOut, AltitudePID.strOut	};
 
 //----------------------------------------
 // Data received from radio
@@ -108,9 +120,11 @@ char** PIDDataAccessor(void)
 	memset(YawPID.strOut, '\0', sizeof(YawPID.strOut));
 	memset(PitchPID.strOut, '\0', sizeof(PitchPID.strOut));
 	memset(RollPID.strOut, '\0', sizeof(RollPID.strOut));
+	memset(AltitudePID.strOut, '\0', sizeof(AltitudePID.strOut));
 	memset(YawPID.strIn, '\0', sizeof(YawPID.strIn));
 	memset(PitchPID.strIn, '\0', sizeof(PitchPID.strIn));
 	memset(RollPID.strIn, '\0', sizeof(RollPID.strIn));
+	memset(AltitudePID.strIn, '\0', sizeof(AltitudePID.strIn));
 	memset(Motors[0].strPower, '\0', sizeof(Motors[0].strPower));
 	memset(Motors[1].strPower, '\0', sizeof(Motors[1].strPower));
 	memset(Motors[2].strPower, '\0', sizeof(Motors[2].strPower));
@@ -124,9 +138,11 @@ char** PIDDataAccessor(void)
 	ftoa(YawPID.in, 		PIDStrPtrs[4], 4);
 	ftoa(PitchPID.in, 		PIDStrPtrs[5], 4);
 	ftoa(RollPID.in, 		PIDStrPtrs[6], 4);
-	ftoa(YawPID.out, 		PIDStrPtrs[7], 4);
-	ftoa(PitchPID.out, 		PIDStrPtrs[8], 4);
-	ftoa(RollPID.out, 		PIDStrPtrs[9], 4);
+	ftoa(AltitudePID.in, 	PIDStrPtrs[7], 4);
+	ftoa(YawPID.out, 		PIDStrPtrs[8], 4);
+	ftoa(PitchPID.out, 		PIDStrPtrs[9], 4);
+	ftoa(RollPID.out, 		PIDStrPtrs[10], 4);
+	ftoa(AltitudePID.out, 	PIDStrPtrs[11], 4);
 
 	return (char**)PIDStrPtrs;
 }
@@ -138,20 +154,104 @@ char** PIDDataAccessor(void)
 //----------------------------------------
 void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 {
-	TivacopterControl.throttle = atof(RemoteCtrlKeys[0]);
-	U_SAT(TivacopterControl.throttle, 1.0f);
+	char* test = RemoteCtrlKeys[0];
+	TivacopterControl.Throttle = atof(test);
+	U_SAT(TivacopterControl.Throttle, 1.0f);
 
-	TivacopterControl.direction[x] = atof(RemoteCtrlKeys[1]);
-	U_SAT(TivacopterControl.direction[x], 1.0f);
+	TivacopterControl.Direction[x] = atof(RemoteCtrlKeys[1]);
+	U_SAT(TivacopterControl.Direction[x], 1.0f);
 
-	TivacopterControl.direction[y] = atof(RemoteCtrlKeys[2]);
-	U_SAT(TivacopterControl.direction[y], 1.0f);
+	TivacopterControl.Direction[y] = atof(RemoteCtrlKeys[2]);
+	U_SAT(TivacopterControl.Direction[y], 1.0f);
 
-	TivacopterControl.yaw = atof(RemoteCtrlKeys[3]);
-	U_SAT(TivacopterControl.yaw, PI);
+	TivacopterControl.Yaw = atof(RemoteCtrlKeys[3]);
+	U_SAT(TivacopterControl.Yaw, PI);
 
-	TivacopterControl.beep = ('1' == RemoteCtrlKeys[4][0]);
-	beep(TivacopterControl.beep);
+	TivacopterControl.Beep = ('1' == RemoteCtrlKeys[4][0]);
+	beep(TivacopterControl.Beep);
+}
+
+//------------------------------------------
+// Set kp, ki and kd coeficients of Yaw PID
+//------------------------------------------
+void SetYawPID_cmd(int argc, char *argv[])
+{
+	if(checkArgRange(&Console, argc, 4, 5))
+	{
+		YawPID.Kp = 	atoi(argv[1]);
+		YawPID.Ki = 	atoi(argv[2]);
+		YawPID.Kd = 	atoi(argv[3]);
+		if(argc == 5)
+			YawPID.ILimit = atoi(argv[4]);
+	}
+}
+
+//-------------------------------------------
+// Set kp, ki and kd coeficients of Pitch PID
+//-------------------------------------------
+void SetPitchPID_cmd(int argc, char *argv[])
+{
+	if(checkArgRange(&Console, argc, 4, 5))
+	{
+		PitchPID.Kp = 		atoi(argv[1]);
+		PitchPID.Ki = 		atoi(argv[2]);
+		PitchPID.Kd = 		atoi(argv[3]);
+		if(argc == 5)
+			PitchPID.ILimit = 	atoi(argv[4]);
+	}
+}
+
+//------------------------------------------
+// Set kp, ki and kd coeficients of Roll PID
+//------------------------------------------
+void SetRollPID_cmd(int argc, char *argv[])
+{
+	if(checkArgRange(&Console, argc, 4, 5))
+	{
+		RollPID.Kp = 		atoi(argv[1]);
+		RollPID.Ki =		atoi(argv[2]);
+		RollPID.Kd =		atoi(argv[3]);
+		if(argc == 5)
+			RollPID.ILimit =	atoi(argv[4]);
+	}
+}
+
+//------------------------------------------
+// Set kp, ki and kd coeficients of Altitude
+// PID.
+//------------------------------------------
+void SetAltitudePID_cmd(int argc, char *argv[])
+{
+	if(checkArgRange(&Console, argc, 4, 5))
+	{
+		AltitudePID.Kp = 		atoi(argv[1]);
+		AltitudePID.Ki = 		atoi(argv[2]);
+		AltitudePID.Kd = 		atoi(argv[3]);
+		if(argc == 5)
+			AltitudePID.ILimit =	atoi(argv[4]);
+	}
+}
+
+static void CheckSuccess(bool success)
+{
+	if(!success)
+	{
+		Log_error0("Error (re)allocating memory for UART console Warper commands.");
+		ASSERT(FALSE);
+	}
+}
+
+//----------------------------------------
+// Subscribe PIDs cmds:
+// Subscribes UART CLI comands to change
+// PIDs coefficents
+//----------------------------------------
+void SubscribePIDsCmds(void)
+{
+	CheckSuccess(SubscribeCmd(&Console, "setYawPID", 		SetYawPID_cmd, 		"Sets Yaw PID coefficients. e.g. \"setYawPID 0.03 0.04 0 0.2\" for kp = 0.03, ki = 0.04, kd = 0.0 ands ILimit = 0.2 (ILimit is optionnal)"));
+	CheckSuccess(SubscribeCmd(&Console, "setPitchPID", 		SetPitchPID_cmd, 	"Sets Pitch PID coefficients."));
+	CheckSuccess(SubscribeCmd(&Console, "setRollPID", 		SetRollPID_cmd, 	"Sets Roll PID coefficients."));
+	CheckSuccess(SubscribeCmd(&Console, "setAltitudePID", 	SetAltitudePID_cmd, "Sets Altitude PID coefficients."));
 }
 
 //----------------------------------------
@@ -160,15 +260,18 @@ void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 void PIDTask(void)
 {
 	// We just want the quadcopter to be horizontal (no radio control)
-	YawPID.in = 0; PitchPID.in = 0; RollPID.in = 0;
+	YawPID.in = 0.0; PitchPID.in = 0.0; RollPID.in = 0.0; AltitudePID.in = 0.0;
 
 	// Update radio inputs
 	GPIOPEHwi();
 
+	// Subscribe UART console PID commands
+	SubscribePIDsCmds();
+
 	// Suscribe a bluetooth datasource to send periodically PID's data
 	JSONDataSource* PID_ds = SuscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
-																						"YawIn", "PitchIn", "RollIn",
-																						"YawOut", "PitchOut", "RollOut"}, 10, 20, PIDDataAccessor);
+																						"YawIn", "PitchIn", "RollIn", "AltitudeIn",
+																						"YawOut", "PitchOut", "RollOut", "AltitudeOut"}, 12, 20, PIDDataAccessor);
 
 	// Suscribe a bluetooth datasource to send periodically Radio's data
 	JSONDataSource* Radio_ds = SuscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
@@ -198,9 +301,9 @@ void PIDTask(void)
 			MapRadioInputToQuadcopterControl();
 
 		// Map TivacopterControl to PIDs input
-		YawPID.in = TivacopterControl.yaw;
-		PitchPID.in = PI/4 * TivacopterControl.direction[x];
-		RollPID.in = PI/4 * TivacopterControl.direction[y];
+		YawPID.in = TivacopterControl.Yaw;
+		PitchPID.in = PI/4 * TivacopterControl.Direction[x];
+		RollPID.in = PI/4 * TivacopterControl.Direction[y];
 
 		// Get error using euler angles from IMU
 		PitchPID.error = IMU.pitch - PitchPID.in;
@@ -209,13 +312,20 @@ void PIDTask(void)
 		ProcessPID(&PitchPID);
 		ProcessPID(&RollPID);
 
-		// Convert euler angles to motors command
-		Motors[0].power =   PitchPID.out + RollPID.out + TivacopterControl.throttle;
-		Motors[1].power = - PitchPID.out + RollPID.out + TivacopterControl.throttle;
-		Motors[2].power = - PitchPID.out - RollPID.out + TivacopterControl.throttle;
-		Motors[3].power =   PitchPID.out - RollPID.out + TivacopterControl.throttle;
+		if(TivacopterControl.AltitudeStabilizationEnabled)
+		{
+			AltitudePID.error = IMU.accel->val[z];
+			ProcessPID(&AltitudePID);
+			TivacopterControl.Throttle += AltitudePID.out;
+		}
 
-		if(TivacopterControl.yawRegulationEnabled)
+		// Convert euler angles to motors command
+		Motors[0].power =   PitchPID.out + RollPID.out + TivacopterControl.Throttle;
+		Motors[1].power = - PitchPID.out + RollPID.out + TivacopterControl.Throttle;
+		Motors[2].power = - PitchPID.out - RollPID.out + TivacopterControl.Throttle;
+		Motors[3].power =   PitchPID.out - RollPID.out + TivacopterControl.Throttle;
+
+		if(TivacopterControl.YawRegulationEnabled)
 		{
 			YawPID.error = IMU.yaw - YawPID.in;
 			ProcessPID(&YawPID);
@@ -294,39 +404,38 @@ static void MapRadioInputToQuadcopterControl(void)
 {
 	if(RadioIn[0] == "1")
 	{
-		TivacopterControl.throttle += 0.0005;
-		U_SAT(TivacopterControl.throttle, 1.0f);
+		TivacopterControl.Throttle += 0.0005;
+		U_SAT(TivacopterControl.Throttle, 1.0f);
 	}
 	else
-		TivacopterControl.throttle = 0;
+		TivacopterControl.Throttle = 0;
 
 	if(RadioIn[1] == "1")
 	{
-		TivacopterControl.direction[x] += 0.0005;
-		SAT(TivacopterControl.direction[x], 1.0f);
+		TivacopterControl.Direction[x] += 0.0005;
+		SAT(TivacopterControl.Direction[x], 1.0f);
 	}
 	else if(RadioIn[2] == "1")
 	{
-		TivacopterControl.direction[x] -= 0.0005;
-		SAT(TivacopterControl.throttle, 1.0f);
+		TivacopterControl.Direction[x] -= 0.0005;
+		SAT(TivacopterControl.Throttle, 1.0f);
 	}
 	else
-		TivacopterControl.direction[x] = 0;
+		TivacopterControl.Direction[x] = 0;
 
 	if(RadioIn[3] == "1")
 	{
-		TivacopterControl.direction[y] += 0.0005;
-		SAT(TivacopterControl.throttle, 1.0f);
+		TivacopterControl.Direction[y] += 0.0005;
+		SAT(TivacopterControl.Throttle, 1.0f);
 	}
 	else if(RadioIn[4] == "1")
 	{
-		TivacopterControl.direction[y] -= 0.0005;
-		SAT(TivacopterControl.throttle, 1.0f);
+		TivacopterControl.Direction[y] -= 0.0005;
+		SAT(TivacopterControl.Throttle, 1.0f);
 	}
 	else
-		TivacopterControl.direction[y] = 0;
+		TivacopterControl.Direction[y] = 0;
 
 	// When we control quadcopter by radio, the quadcopter orientation is always ahead
-	TivacopterControl.yaw = atan2(TivacopterControl.direction[y], TivacopterControl.direction[x]);
-
+	TivacopterControl.Yaw = atan2(TivacopterControl.Direction[y], TivacopterControl.Direction[x]);
 }
