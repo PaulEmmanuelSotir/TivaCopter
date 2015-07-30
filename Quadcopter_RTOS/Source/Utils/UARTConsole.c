@@ -96,7 +96,7 @@ void UARTConsoleConfig(UARTConsole* console, uint32_t PortNum, uint32_t SrcClock
 	MAP_UARTConfigSetExpClk(console->UARTBase, SrcClock, BaudRate, (UART_CONFIG_PAR_NONE | UART_CONFIG_STOP_ONE | UART_CONFIG_WLEN_8));
 
 	// Set the UART to interrupt whenever the TX FIFO is almost empty or when any character is received.
-	MAP_UARTFIFOLevelSet(console->UARTBase, UART_FIFO_TX1_8, UART_FIFO_RX2_8);//UART_FIFO_RX1_8);
+	MAP_UARTFIFOLevelSet(console->UARTBase, UART_FIFO_TX1_8, UART_FIFO_RX1_8);//UART_FIFO_RX1_8);
 
 	// Flush both the buffers.
 	UARTFlushRx(console);
@@ -382,7 +382,7 @@ void ConsoleUARTIntHandler(UARTConsole* console, uint32_t IntStatus)
 //----------------------------------------------------------------------------
 static void NotifyCharacterReceived(UARTConsole* console, char c)
 {
-	if(console->CurrentlyRunningCmd && console->CmdLineInterfaceDisabled)
+	if(console->CurrentlyRunningCmd != NULL && console->CmdLineInterfaceDisabled)
 		if(strchr(console->CurrentlyRunningCmd->interestingChars, c) != NULL)
 			console->CurrentlyRunningCmd->cb(c);
 }

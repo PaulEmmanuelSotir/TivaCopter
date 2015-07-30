@@ -19,7 +19,7 @@
 // receive buffers respectively.
 //-----------------------------------------------
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     512
+#define UART_RX_BUFFER_SIZE     4096
 #endif
 #ifndef UART_TX_BUFFER_SIZE
 #define UART_TX_BUFFER_SIZE     4096
