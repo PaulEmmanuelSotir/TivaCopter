@@ -226,10 +226,11 @@ void PIDTask(void)
 		}
 
 		// Limit motors power to its range
-		U_SAT(Motors[0].power, 1.0f);
-		U_SAT(Motors[1].power, 1.0f);
-		U_SAT(Motors[2].power, 1.0f);
-		U_SAT(Motors[3].power, 1.0f);
+		// We limit motors throttle to 70% for the moment
+		U_SAT(Motors[0].power, 0.7f);
+		U_SAT(Motors[1].power, 0.7f);
+		U_SAT(Motors[2].power, 0.7f);
+		U_SAT(Motors[3].power, 0.7f);
 
 		// Map motors power into their real range (from measured minimum power to start each motors)
 		Motors[0].power = Motors[0].power * (1.0f-MOTOR1_POWER_OFFSET) + MOTOR1_POWER_OFFSET;
