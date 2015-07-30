@@ -31,7 +31,7 @@
 #include "JSONCommunication.h"
 
 static bool JSONCommunicationStarted = false;
-static bool JSONProgrammaticAccessMode = false;
+static bool JSONProgrammaticAccessMode = true;
 
 //----------------------------------------
 // UART console from 'main.c'
