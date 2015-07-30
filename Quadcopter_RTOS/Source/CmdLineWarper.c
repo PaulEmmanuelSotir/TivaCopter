@@ -17,10 +17,11 @@
 #include <xdc/runtime/Log.h>				//needed for any Log_info() call
 #include <xdc/cfg/global.h> 				//header file for statically defined objects/handles
 
-#include "Utils\utils.h"
-#include "Utils\UARTConsole.h"
-#include "Utils\I2CTransaction.h"
-#include "Utils\UARTConsole.h"
+#include "driverlib/debug.h"
+#include "Utils/utils.h"
+#include "Utils/UARTConsole.h"
+#include "Utils/I2CTransaction.h"
+#include "Utils/UARTConsole.h"
 #include "PinMap.h"
 
 #include "CmdLineWarper.h"
@@ -94,19 +95,22 @@ static void WriteTransactionCallback(uint32_t status, uint8_t* buffer, uint32_t 
 //----------------------------------------
 void SubscribeWarperCmds(void)
 {
-	bool sucess = true;
+	void CheckSuccess(bool success);
 
 	// I2C transaction API to UART command line interface warper
-	sucess = sucess && SubscribeCmd(&Console, "i2cSelect", 	I2CSelect_cmd, 			"Detrmines which I2C peripheral will be used for next i2c command calls (Default is IMU_I2C_BASE). e.g. \"i2cSelect 3\"");
-	sucess = sucess && SubscribeCmd(&Console, "i2cregr", 	I2CRegRead_cmd, 		"Performs an asynchronous I2C register read operation. First argument is slave decimal address, second one is the first I2C register decimal address and the last one is the number of bytes to be read.");
-	sucess = sucess && SubscribeCmd(&Console, "i2cregw", 	I2CRegWrite_cmd, 		"Performs an asynchronous I2C register write operation. First argument is slave decimal address, second one is the I2C register decimal address and the other ones are bytes to be writen in decimal format.");
-	sucess = sucess && SubscribeCmd(&Console, "i2cregrmw", 	I2CRegReadModifyWrite, 	"Performs an asynchronous I2C register read-modify-write operation. First argument is slave decimal address, second one is the first I2C register decimal address, the third one is the decimal bit mask and the last one is the decimal value.");
-	sucess = sucess && SubscribeCmd(&Console, "i2cw", 		I2CWrite_cmd, 			"Performs an asynchronous I2C write operation. First argument is slave decimal address and the other ones are bytes to be writen in decimal format.");
+	CheckSuccess(SubscribeCmd(&Console, "i2cSelect", 	I2CSelect_cmd, 			"Detrmines which I2C peripheral will be used for next i2c command calls (Default is IMU_I2C_BASE). e.g. \"i2cSelect 3\""));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregr", 	I2CRegRead_cmd, 		"Performs an asynchronous I2C register read operation. First argument is slave decimal address, second one is the first I2C register decimal address and the last one is the number of bytes to be read."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregw", 	I2CRegWrite_cmd, 		"Performs an asynchronous I2C register write operation. First argument is slave decimal address, second one is the I2C register decimal address and the other ones are bytes to be writen in decimal format."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cregrmw", 	I2CRegReadModifyWrite, 	"Performs an asynchronous I2C register read-modify-write operation. First argument is slave decimal address, second one is the first I2C register decimal address, the third one is the decimal bit mask and the last one is the decimal value."));
+	CheckSuccess(SubscribeCmd(&Console, "i2cw", 		I2CWrite_cmd, 			"Performs an asynchronous I2C write operation. First argument is slave decimal address and the other ones are bytes to be writen in decimal format."));
+}
 
-	if(!sucess)
+static void CheckSuccess(bool success)
+{
+	if(!success)
 	{
 		Log_error0("Error (re)allocating memory for UART console Warper commands.");
-		return;
+		ASSERT(FALSE);
 	}
 }
 
