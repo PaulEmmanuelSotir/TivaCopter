@@ -157,9 +157,9 @@ static char** IMUDataAccessor(void)
 	ftoa(IMU.yaw, 	IMU.IMUStrPtrs[4], 4);
 	ftoa(IMU.pitch, IMU.IMUStrPtrs[5], 4);
 	ftoa(IMU.roll, 	IMU.IMUStrPtrs[6], 4);
-	ftoa(IMU.pos[0],IMU.IMUStrPtrs[7], 3);
-	ftoa(IMU.pos[1],IMU.IMUStrPtrs[8], 3);
-	ftoa(IMU.pos[2],IMU.IMUStrPtrs[9], 3);
+//	ftoa(IMU.pos[0],IMU.IMUStrPtrs[7], 3);
+//	ftoa(IMU.pos[1],IMU.IMUStrPtrs[8], 3);
+//	ftoa(IMU.pos[2],IMU.IMUStrPtrs[9], 3);
 
 	return (char**)IMU.IMUStrPtrs;
 }
@@ -255,12 +255,18 @@ void IMUProcessingTask(void)
 		IMU.IMUStrPtrs[i] = &IMU.IMUStrValues[i][0];
 
 	// Suscribe a bluetooth datasource to send periodically Sensors's data
-	JSONDataSource* Sensorsds = SuscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
+	JSONDataSource* Sensors_ds = SuscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
 																					"gx", "gy", "gz",
 																					"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
 
 	// Suscribe a bluetooth datasource to send periodically IMU's data
-	JSONDataSource* IMUds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll", "px", "py", "pz"}, 10, 20, IMUDataAccessor);
+	JSONDataSource* IMU_ds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll"}, 7, 20, IMUDataAccessor);//, "px", "py", "pz"}, 10, 20, IMUDataAccessor);
+
+	if(Sensors_ds == NULL || IMU_ds == NULL)
+	{
+		Log_error0("Failed to subscribe to 'sensors' data source or 'IMU' data source.");
+		return;
+	}
 
 	while(1)
 	{

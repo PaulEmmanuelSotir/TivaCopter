@@ -178,6 +178,12 @@ void PIDTask(void)
 	// Subscribe a bluetooth datainput to receive remote control data
 	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControl", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
 
+	if(PID_ds == NULL || Radio_ds == NULL || RemoteControl_di == NULL)
+	{
+		Log_error0("Failed to subscribe to 'PID' data source, 'radio' data source or 'RemoteControl' data input.");
+		return;
+	}
+
 	while(1)
 	{
 		// TODO: savoir si il faudrais mettre ici un timout pour mettre la poussée des moteurs à 0.
