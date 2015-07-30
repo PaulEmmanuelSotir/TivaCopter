@@ -39,24 +39,24 @@ static bool JSONProgrammaticAccessMode = true;
 extern UARTConsole Console;
 
 //----------------------------------------
-// Private dynamic JSON data sources array
+// Private static JSON data sources array
 //----------------------------------------
 static struct
 {
-	JSONDataSource *array;
+	JSONDataSource array[MAX_DATASOURCE_COUNT];
 	uint32_t used;
-	uint32_t size;
-} JSONDataSources = {NULL, 0, 0};
+} JSONDataSources = {.used = 0};
 
 //----------------------------------------
-// Private dynamic JSON data inputs array
+// Private static JSON data inputs array
 //----------------------------------------
 static struct
 {
-	JSONDataInput *array;
+	JSONDataInput array[MAX_DATAINPUT_COUNT];
 	uint32_t used;
-	uint32_t size;
-} JSONDataInputs = {NULL, 0, 0};
+} JSONDataInputs = {.used = 0};
+
+static JSONDataSource* rawEcho_ds;
 
 //----------------------------------------
 // list sources:
@@ -180,9 +180,14 @@ static void NewJSONObjectReceived(char c)
 // names of the data fields provided by the
 // datasource.
 //--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(char* name, const char* keys[], uint32_t dataCount)
+JSONDataSource* SuscribeJSONDataSource(const char* name, const char* keys[], uint32_t dataCount)
 {
-	return SuscribePeriodicJSONDataSource(name, keys, dataCount, 0, NULL);
+	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, true);
+}
+
+JSONDataSource* SuscribeJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, bool enabled)
+{
+	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, enabled);
 }
 
 //--------------------------------------------
@@ -195,30 +200,32 @@ JSONDataSource* SuscribeJSONDataSource(char* name, const char* keys[], uint32_t 
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
+JSONDataSource* SuscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
 {
-	// If there is no more available space in JSONDataSources array, we allocate more memory.
-	if (JSONDataSources.used == JSONDataSources.size)
-	{
-		JSONDataSources.size += 4;
-		JSONDataSources.array = (JSONDataSource *)realloc(JSONDataSources.array, JSONDataSources.size * sizeof(JSONDataSource));
+	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, period, dataAccessor, true);
+}
 
-		// Verify wether if any error occured during memory allocation.
-		if (JSONDataSources.array == NULL)
-		{
-			JSONDataSources.size = 0;
-			JSONDataSources.used = 0;
-			free(JSONDataSources.array);
-			Log_error0("Error (re)allocating memory for JSON datasources.");
-			return NULL;
-		}
+JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled)
+{
+	if(dataCount > MAX_DATA_COUNT)
+	{
+		Log_error1("Error: Too much data fields given to create a new datasource (please modify MAX_DATA_COUNT=%u if needed).", MAX_DATA_COUNT);
+		ASSERT(FALSE);
+		return NULL;
+	}
+
+	if (JSONDataSources.used == MAX_DATASOURCE_COUNT)
+	{
+		Log_error1("Error: Maximum JSON datasources count reached (please modify MAX_DATASOURCE_COUNT=%u if needed).", MAX_DATASOURCE_COUNT);
+		ASSERT(FALSE);
+		return NULL;
 	}
 
 	JSONDataSource* newSource = &JSONDataSources.array[JSONDataSources.used++];
 	newSource->name = name;
 	newSource->keys = keys;
 	newSource->dataCount = dataCount;
-	newSource->enabled = false;
+	newSource->enabled = enabled;
 	newSource->period = period;
 	newSource->dataAccessor = dataAccessor;
 	newSource->sendNowFlag = false;
@@ -234,9 +241,7 @@ JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], u
 		clockParams.arg = (UArg)newSource;
 		if(Clock_create(PeriodicJSONDataSendingSwi, period, &clockParams, &eb) == NULL)
 		{
-			JSONDataSources.size = 0;
-			JSONDataSources.used = 0;
-			free(JSONDataSources.array);
+			JSONDataSources.used--;
 			Log_error0("Error: Periodic data source clock creation failed.");
 			return NULL;
 		}
@@ -296,8 +301,12 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 
 					UARTwrite(&Console, JSONProgrammaticAccessMode ? " }" : "\n}", 2);
 
-					// Send data now to avoid data losses due to limited buffer size
-					UARTFlushTx(&Console, false);
+					// If Tx UART console buffer is near to be full, we wait for UART transmition
+					// TODO: trouver mieux !
+					uint32_t timeout = 10;
+					if(UARTTxBytesFree(&Console) < 128)
+						while(UARTTxBytesFree(&Console) < 1024 && --timeout)
+							Task_sleep(1);
 
 					return true;
 				}
@@ -320,7 +329,7 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 //------------------------------------------
 void PeriodicJSONDataSendingTask(void)
 {
-	// Subsribe UART console commands for JSON communication
+	// Subscribe UART console commands for JSON communication
 	bool sucess = true;
 	sucess = sucess && SubscribeCmd(&Console, "listSources", 	JSON_list_sources_cmd, 	"List all available JSON data sources.");
 	sucess = sucess && SubscribeCmd(&Console, "enable", 		JSON_enable_cmd, 		"Enables specified JSON data source's stream (only active once \'start\' have been called).");
@@ -423,28 +432,24 @@ static void PeriodicJSONDataSendingSwi(UArg dataSource)
 //--------------------------------------------
 JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t dataCount, DataValuesSetAccessor dataAccessor)
 {
-	// If there is no more available space in JSONDataSources array, we allocate more memory.
-	if (JSONDataInputs.used == JSONDataInputs.size)
+	if(dataCount > MAX_DATA_COUNT)
 	{
-		JSONDataInputs.size += 2;
-		JSONDataInputs.array = (JSONDataInput *)realloc(JSONDataInputs.array, JSONDataInputs.size * sizeof(JSONDataInputs));
+		Log_error1("Error: Too much data fields given to create a new datainput (please modify MAX_DATA_COUNT=%u if needed).", MAX_DATA_COUNT);
+		ASSERT(false);
+		return NULL;
+	}
 
-		// Verify wether if any error occured during memory allocation.
-		if (JSONDataInputs.array == NULL)
-		{
-			JSONDataInputs.size = 0;
-			JSONDataInputs.used = 0;
-			free(JSONDataInputs.array);
-			Log_error0("Error (re)allocating memory for JSON datainputs.");
-			return NULL;
-		}
+	if (JSONDataInputs.used == MAX_DATAINPUT_COUNT)
+	{
+		Log_error1("Error: Maximum JSON datainputs count reached (please modify MAX_DATAINPUT_COUNT=%u if needed).", MAX_DATAINPUT_COUNT);
+		ASSERT(false);
+		return NULL;
 	}
 
 	JSONDataInput* newInput = &JSONDataInputs.array[JSONDataInputs.used++];
 	newInput->name = name;
 	newInput->keys = keys;
 	newInput->dataCount = dataCount;
-	newInput->updated = false;
 	newInput->dataAccessor = dataAccessor;
 
 	return newInput;

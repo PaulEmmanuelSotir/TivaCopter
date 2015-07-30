@@ -11,6 +11,26 @@
 
 #include "Utils/UARTConsole.h"
 
+#ifndef MAX_DATASOURCE_COUNT
+#define MAX_DATASOURCE_COUNT			10
+#endif
+
+#ifndef MAX_DATAINPUT_COUNT
+#define MAX_DATAINPUT_COUNT				2
+#endif
+
+#ifndef INPUT_JSON_BUFFER_SIZE
+#define INPUT_JSON_BUFFER_SIZE			512
+#endif
+
+#ifndef INPUT_JSON_TOKEN_NUM
+#define INPUT_JSON_TOKEN_NUM			128
+#endif
+
+#ifndef MAX_DATA_COUNT
+#define MAX_DATA_COUNT					32
+#endif
+
 //----------------------------------------
 // Data accessor function typedef used to
 // get string data array from datasources.
@@ -27,7 +47,7 @@ typedef void (*DataValuesSetAccessor)(char**);
 typedef struct
 {
 	// Datasource name
-	char* name;
+	const char* name;
 	// Data names table
 	const char** keys;
 	// Data member count (length of arrays)
@@ -50,14 +70,12 @@ typedef struct
 typedef struct
 {
 	// Datas input name
-	char* name;
+	const char* name;
 	// Data names table
 	const char** keys;
 	// Data member count (length of arrays)
 	uint32_t dataCount;
 	DataValuesSetAccessor dataAccessor;
-	// Boolean indicating whether if the the strucure contains unread data.
-	bool updated;
 } JSONDataInput;
 
 //----------------------------------------
@@ -79,7 +97,8 @@ void JSON_disable_programatic_access_cmd(int argc, char *argv[]);
 // names of the data fields provided by the
 // datasource.
 //--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(char* name,const char* keys[], uint32_t dataCount);
+JSONDataSource* SuscribeJSONDataSource(const char* name,const char* keys[], uint32_t dataCount);
+JSONDataSource* SuscribeJSONDataSource2(const char* name,const char* keys[], uint32_t dataCount, bool enabled);
 
 //--------------------------------------------
 // Suscribe periodic data source:
@@ -91,7 +110,8 @@ JSONDataSource* SuscribeJSONDataSource(char* name,const char* keys[], uint32_t d
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
+JSONDataSource* SuscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
+JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled);
 
 //--------------------------------------------
 // Send data:
