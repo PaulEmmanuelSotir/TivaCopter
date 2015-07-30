@@ -343,6 +343,8 @@ void PeriodicJSONDataSendingTask(void)
 		return;
 	}
 
+	// Subscribe raw echo from data inputs JSON datasource
+	rawEcho_ds = SuscribeJSONDataSource2("rawEcho", (const char*[]) { "rawInput" }, 2, false);
 	while(1)
 	{
 		Semaphore_pend(PeriodicJSON_Sem, BIOS_WAIT_FOREVER);
