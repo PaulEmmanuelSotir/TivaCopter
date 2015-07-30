@@ -1,7 +1,7 @@
 TivaCopter
 ========
 
-TivaCopter is a DIY quadcopter project based on tiva connected launchpad using TI RTOS.
+TivaCopter is a DIY quadcopter project based on Tiva TM4C129XX MCU using TI RTOS.
 
 Folder structure
 --------
@@ -23,6 +23,7 @@ Hardware
 * HC-05 bluetooth module
 * MPU6050 6DOF accelerometer and gyroscope
 * HMC5883L 3 axis magnetometer
+* BMP180 Bosh pressure sensor
 * 27MHz Radio from remote toy
 * F450 quadcopter frame
 
