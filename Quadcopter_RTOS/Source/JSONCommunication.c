@@ -184,6 +184,61 @@ void JSON_disable_programatic_access_cmd(int argc, char *argv[])
 //------------------------------------------
 static void NewJSONObjectReceived(char c)
 {
+	static char buf[INPUT_JSON_BUFFER_SIZE];
+	static jsmntok_t tokens[INPUT_JSON_TOKEN_NUM];
+	static jsmn_parser parser;
+	static char data[MAX_DATA_COUNT][32];
+	static char* dataPtrs[MAX_DATA_COUNT];
+
+	uint32_t i, j, tokNum;
+	jsmntok_t* tok;
+	JSONDataInput* di;
+	const char* key;
+
+//TODO : lock
+	memset(buf, 0, INPUT_JSON_BUFFER_SIZE);
+	memset(data, 0, 32*MAX_DATA_COUNT);
+
+	UARTgets(&Console, buf, INPUT_JSON_BUFFER_SIZE);
+
+	if(rawEcho_ds != NULL)
+		if(rawEcho_ds->enabled)
+			SendJSONData(rawEcho_ds, &buf);
+
+	jsmn_init(&parser);
+	tokNum = jsmn_parse(&parser, buf, INPUT_JSON_BUFFER_SIZE, tokens, INPUT_JSON_TOKEN_NUM);
+
+	for(i = 0; i < JSONDataInputs.used; i++)
+	{
+		di = &JSONDataInputs.array[i];
+
+		if(tokNum != di->dataCount*2+1)
+			continue;
+
+		for(j = 0; j < di->dataCount; j++)
+		{
+			tok = &tokens[1+2*j];
+			key = di->keys[j];
+			if(!strncmp(buf + tok->start, key, tok->end - tok->start))
+			{
+				tok = &tokens[2+2*j];
+
+				if(tok->end - tok->start > 32)
+					return;
+
+				strncpy(data[j], buf + tok->start, tok->end - tok->start);
+					dataPtrs[j] = data[j];
+			}
+			else
+				break;
+		}
+
+		if(j == di->dataCount)
+		{
+			di->dataAccessor((char**)dataPtrs);
+			return;
+		}
+	}
 }
 
 //--------------------------------------------
@@ -359,6 +414,7 @@ void PeriodicJSONDataSendingTask(void)
 
 	// Subscribe raw echo from data inputs JSON datasource
 	rawEcho_ds = SuscribeJSONDataSource2("rawEcho", (const char*[]) { "rawInput" }, 2, false);
+
 	while(1)
 	{
 		Semaphore_pend(PeriodicJSON_Sem, BIOS_WAIT_FOREVER);
