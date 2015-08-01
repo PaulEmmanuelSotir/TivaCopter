@@ -76,9 +76,10 @@ typedef struct
 }Motor;
 
 //----------------------------------------
-// GPIO Port E Hardware Interrupt (radio)
+// GPIO Port E Hardware Interrupt handler
+// (radio)
 //----------------------------------------
-void GPIOPEHwi(void);
+void GPIOPEHwiHandler(void);
 
 //----------------------------------------
 // Radio data accessor:

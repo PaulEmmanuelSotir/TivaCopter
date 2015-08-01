@@ -82,7 +82,7 @@ static void MapRadioInputToQuadcopterControl(void);
 //----------------------------------------
 // GPIO Port E Hardware Interrupt (radio)
 //----------------------------------------
-void GPIOPEHwi(void)
+void GPIOPEHwiHandler(void)
 {
 	// Clear the GPIO interrupt.
 	uint32_t intStatus = MAP_GPIOIntStatus(RADIO_PORT, true);
@@ -263,7 +263,7 @@ void PIDTask(void)
 	YawPID.in = 0.0; PitchPID.in = 0.0; RollPID.in = 0.0; AltitudePID.in = 0.0;
 
 	// Update radio inputs
-	GPIOPEHwi();
+	GPIOPEHwiHandler();
 
 	// Subscribe UART console PID commands
 	SubscribePIDsCmds();
