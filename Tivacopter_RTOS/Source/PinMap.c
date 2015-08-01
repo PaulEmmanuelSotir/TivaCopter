@@ -47,6 +47,7 @@ void PortFunctionInit()
     MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOK);
     MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
     MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOM);
+    MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOJ);
 
     // Enable radio channels 1(PE0), 2(PE1), 3(PE2), 4(PE3), 5(PE5)
     MAP_GPIOPinTypeGPIOInput(RADIO_PORT, RADIO_PIN_MASK);
@@ -84,6 +85,11 @@ void PortFunctionInit()
     MAP_GPIOPinTypeGPIOOutput(LED2_PORT, LED2_PIN);
     MAP_GPIOPinTypeGPIOOutput(LED3_PORT, LED3_PIN);
     MAP_GPIOPinTypeGPIOOutput(LED4_PORT, LED4_PIN);
+
+    // Enable switches GPIOs
+    MAP_GPIOPinTypeGPIOInput(U_SW_PORT, U_SW1_PIN | U_SW2_PIN);
+    MAP_GPIOIntTypeSet(U_SW_PORT, U_SW1_PIN | U_SW2_PIN, GPIO_BOTH_EDGES);
+    MAP_GPIOIntEnable(U_SW_PORT, U_SW1_PIN | U_SW2_PIN);
 
     // Enable MPU6050 and HMC5883L I²C pins PB3(I2C0SDA) and PB2(I2C0SCL)
     MAP_GPIOPinConfigure(GPIO_PB3_I2C0SDA);

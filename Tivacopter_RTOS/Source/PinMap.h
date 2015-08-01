@@ -35,6 +35,13 @@
 #define LED4_PIN          		GPIO_PIN_0
 
 //------------------------------------------
+// Board user switches
+//------------------------------------------
+#define U_SW_PORT				GPIO_PORTJ_BASE
+#define U_SW1_PIN				GPIO_PIN_0
+#define U_SW2_PIN				GPIO_PIN_1
+
+//------------------------------------------
 // Bluetooth module (UART and State Pin)
 //------------------------------------------
 //#define BLUETOOTH_STATE_PORT	GPIO_PORTK_BASE

@@ -17,6 +17,7 @@
 //------------------------------------------
 // TivaWare Header Files
 //------------------------------------------
+#include "inc/tm4c1294ncpdt.h"
 #include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/fpu.h"
@@ -48,6 +49,8 @@ void __error__(char *pcFilename, uint32_t ui32Line)
 
 // Bluetooth UART command line interface
 UARTConsole Console;
+// Stop buttons flag
+bool ButtonsPushed;
 // UART interrupt status needed by UART console interrupt handler
 static uint32_t IntStatus;
 
@@ -78,10 +81,10 @@ int main(void)
     return(0);
 }
 
-//----------------------------------------
+//------------------------------------------
 // Bluetooth UART console task:
 // Handles command line interface via UART
-//----------------------------------------
+//------------------------------------------
 void UARTConsoleTask(void)
 {
 	while(1)
@@ -92,9 +95,9 @@ void UARTConsoleTask(void)
 	}
 }
 
-//----------------------------------------
+//------------------------------------------
 // UART3 interrupt handler
-//----------------------------------------
+//------------------------------------------
 void UART3IntHandler(void)
 {
 	// Get and clear the current interrupt source(s)
@@ -165,6 +168,20 @@ void BatteryLevelSwi(void)
 	}
 	else
 		beep(false);
+}
+
+//------------------------------------------
+// GPIO J Hardware interrupt hander
+// (User switch 1 and 2)
+//------------------------------------------
+void GPIOPJHwiHandler(void)
+{
+	// Clear the GPIO interrupt.
+	uint32_t intStatus = MAP_GPIOIntStatus(U_SW_PORT, true);
+	MAP_GPIOIntClear(U_SW_PORT, intStatus);
+
+	uint32_t data = GPIO_PORTJ_AHB_DATA_R;
+	ButtonsPushed = data & U_SW1_PIN || data & U_SW2_PIN;
 }
 
 /*
