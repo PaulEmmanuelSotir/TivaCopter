@@ -39,16 +39,16 @@ extern UARTConsole Console;
 // IMU data structures definition
 //----------------------------------------
 static Magnetometer Magn = {.range = _1300mGa, .xOffset = -27.034f, .yOffset = 59.649f, .zOffset = 149.464f,
-		.M = {	{0.324, 	0, 		2.173},
-				{-0.412, 	1.016, 	0.387},
-				{-2.266, 	-0.043,	0.686}	}};
+							.M = {	{0.324, 	0, 		2.173},
+									{-0.412, 	1.016, 	0.387},
+									{-2.266, 	-0.043,	0.686}	}};
 static Gyroscope Gyro = {.range = _250dps, .xOffset = 0.0f, .yOffset = 0.0f, .zOffset = 0.0f};
 static Accelerometer Accel = {.range = _4g};
 InertialMeasurementUnit IMU = {	.magn = &Magn, .accel = &Accel, . gyro = &Gyro,
-		.q = {1.0, 0.0, 0.0, 0.0},
-		.pos = {0.0, 0.0, 0.0},
-		.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
-		.IMUStrValues = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0"}};
+								.q = {1.0, 0.0, 0.0, 0.0},
+								.pos = {0.0, 0.0, 0.0},
+								.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
+								.IMUStrValues = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0"}};
 
 //----------------------------------------
 // Lock function used by I2C transaction
@@ -251,24 +251,17 @@ void IMUProcessingTask(void)
 		return;
 	}
 
-	// Fill 'SensorsStrPtrs' and 'IMUStrPtrs' string pointer arrays with pointers to 'SensorsStrValues' and 'IMUStrValues' strings
+	// Fill 'IMUStrPtrs' string pointer arrays with pointers to 'IMUStrValues' strings
 	uint32_t i;
-	for(i = 0; i < 9; ++i)
-		IMU.SensorsStrPtrs[i] = &IMU.SensorsStrValues[i][0];
 	for(i = 0; i < 10; ++i)
 		IMU.IMUStrPtrs[i] = &IMU.IMUStrValues[i][0];
-
-	// Subscribe a bluetooth datasource to send periodically Sensors's data
-	JSONDataSource* Sensors_ds = SubscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
-		"gx", "gy", "gz",
-		"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
 
 	// Subscribe a bluetooth datasource to send periodically IMU's data
 	JSONDataSource* IMU_ds = SubscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll"}, 7, 20, IMUDataAccessor);//, "px", "py", "pz"}, 10, 20, IMUDataAccessor);
 
-	if(Sensors_ds == NULL || IMU_ds == NULL)
+	if(IMU_ds == NULL)
 	{
-		Log_error0("Failed to subscribe to 'sensors' data source or 'IMU' data source.");
+		Log_error0("Failed to subscribe 'IMU' data source.");
 		return;
 	}
 
@@ -363,7 +356,7 @@ void IMUProcessingTask(void)
 				}
 				else
 				{
-					//			Log_error0("Wrong magnetometer values.");
+					Log_error0("Wrong magnetometer values.");
 
 					// Auxiliary simplified algorithm-specific variables to avoid repeated arithmetic
 					_4q0 = 4.0f * q0;
@@ -430,6 +423,8 @@ void IMUProcessingTask(void)
 			}
 		}
 	}
+
+	UnsubscribeJSONDataSource(IMU_ds);
 }
 
 //----------------------------------------------------------------------------
@@ -531,6 +526,21 @@ static void TransactionCallback(uint32_t status, uint8_t* buffer, uint32_t lengt
 //------------------------------------------
 void IMUReadingTask(void)
 {
+	// Fill 'SensorsStrPtrs' string pointer arrays with pointers to 'SensorsStrValues' strings
+	uint32_t i;
+	for(i = 0; i < 9; ++i)
+		IMU.SensorsStrPtrs[i] = &IMU.SensorsStrValues[i][0];
+
+	// Subscribe a bluetooth datasource to send periodically Sensors's data
+	JSONDataSource* Sensors_ds = SubscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
+																								"gx", "gy", "gz",
+																								"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
+	if(Sensors_ds == NULL)
+	{
+		Log_error0("Failed to subscribe 'sensors' data source.");
+		return;
+	}
+
 	while(1)
 	{
 		Semaphore_pend(IMUReading_Sem, BIOS_WAIT_FOREVER);
