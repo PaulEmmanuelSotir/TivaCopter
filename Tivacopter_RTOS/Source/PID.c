@@ -39,9 +39,9 @@ extern InertialMeasurementUnit IMU;
 //----------------------------------------
 extern UARTConsole Console;
 
-//------------------------------------------
+//----------------------------------------
 // Beeper state control from 'main.c'
-//------------------------------------------
+//----------------------------------------
 extern void beep(bool state);
 
 //----------------------------------------
@@ -69,6 +69,7 @@ char* PIDStrPtrs[12] =  {	Motors[0].strPower, Motors[1].strPower, Motors[2].strP
 //----------------------------------------
 // Data received from radio
 //----------------------------------------
+static const char* RadioPropertiesNames[5] = { "in0", "in1", "in2", "in3", "in4" }; // We allocate radio datasource properties names here rather than in PID task in order to avoid these names to be deleted if we exit PID task
 char* RadioIn[5] = { "0", "0", "0", "0", "0" };
 static bool RadioInputUpdatedFlag = false;
 
@@ -154,8 +155,7 @@ char** PIDDataAccessor(void)
 //----------------------------------------
 void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 {
-	char* test = RemoteCtrlKeys[0];
-	TivacopterControl.Throttle = atof(test);
+	TivacopterControl.Throttle = atof(RemoteCtrlKeys[0]);
 	U_SAT(TivacopterControl.Throttle, 1.0f);
 
 	TivacopterControl.Direction[x] = atof(RemoteCtrlKeys[1]);
@@ -268,13 +268,13 @@ void PIDTask(void)
 	// Subscribe UART console PID commands
 	SubscribePIDsCmds();
 
-	// Suscribe a bluetooth datasource to send periodically PID's data
-	JSONDataSource* PID_ds = SuscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
+	// Subscribe a bluetooth datasource to send periodically PID's data
+	JSONDataSource* PID_ds = SubscribePeriodicJSONDataSource("PID", (const char*[]) {	"motor1", "motor2", "motor3", "motor4",
 																						"YawIn", "PitchIn", "RollIn", "AltitudeIn",
 																						"YawOut", "PitchOut", "RollOut", "AltitudeOut"}, 12, 20, PIDDataAccessor);
 
-	// Suscribe a bluetooth datasource to send periodically Radio's data
-	JSONDataSource* Radio_ds = SuscribePeriodicJSONDataSource("radio", (const char*[]) { "in0", "in1", "in2", "in3", "in4" }, 5, 40, RadioDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically Radio's data
+	JSONDataSource* Radio_ds = SubscribePeriodicJSONDataSource("radio", RadioPropertiesNames, 5, 40, RadioDataAccessor);
 
 	// Subscribe a bluetooth datainput to receive remote control data
 	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControl", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
@@ -291,11 +291,7 @@ void PIDTask(void)
 		Semaphore_pend(PID_Sem, BIOS_WAIT_FOREVER);
 
 		if(TivacopterControl.ShutOffMotors)
-		{
-			// Turn off motors if any problem occurs
-			TurnOffMotors();
-			return;
-		}
+			break;
 
 		if(TivacopterControl.RadioControlEnabled && RadioInputUpdatedFlag)
 			MapRadioInputToQuadcopterControl();
@@ -354,6 +350,10 @@ void PIDTask(void)
 		TimerMatchSet(TIMER3_BASE, TIMER_A, (Motors[2].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
 		TimerMatchSet(TIMER3_BASE, TIMER_B, (Motors[3].power * (MAX_MOTOR - MIN_MOTOR))	+ MIN_MOTOR);
 	}
+
+	TurnOffMotors();
+	UnsubscribeJSONDataSource(PID_ds);
+	UnsubscribeJSONDataInput(RemoteControl_di);
 }
 
 //----------------------------------------
@@ -389,6 +389,11 @@ static inline void ProcessPID(PID* pid)
 //----------------------------------------
 static void TurnOffMotors(void)
 {
+	Motors[0].power = 0;
+	Motors[1].power = 0;
+	Motors[2].power = 0;
+	Motors[3].power = 0;
+
 	TimerMatchSet(TIMER2_BASE, TIMER_A, MIN_MOTOR);
 	TimerMatchSet(TIMER2_BASE, TIMER_B, MIN_MOTOR);
 	TimerMatchSet(TIMER3_BASE, TIMER_A, MIN_MOTOR);

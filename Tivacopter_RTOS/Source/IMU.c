@@ -39,16 +39,16 @@ extern UARTConsole Console;
 // IMU data structures definition
 //----------------------------------------
 static Magnetometer Magn = {.range = _1300mGa, .xOffset = -27.034f, .yOffset = 59.649f, .zOffset = 149.464f,
-							.M = {	{0.324, 	0, 		2.173},
-									{-0.412, 	1.016, 	0.387},
-									{-2.266, 	-0.043,	0.686}	}};
+		.M = {	{0.324, 	0, 		2.173},
+				{-0.412, 	1.016, 	0.387},
+				{-2.266, 	-0.043,	0.686}	}};
 static Gyroscope Gyro = {.range = _250dps, .xOffset = 0.0f, .yOffset = 0.0f, .zOffset = 0.0f};
 static Accelerometer Accel = {.range = _4g};
 InertialMeasurementUnit IMU = {	.magn = &Magn, .accel = &Accel, . gyro = &Gyro,
-								.q = {1.0, 0.0, 0.0, 0.0},
-								.pos = {0.0, 0.0, 0.0},
-								.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
-								.IMUStrValues = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0"}};
+		.q = {1.0, 0.0, 0.0, 0.0},
+		.pos = {0.0, 0.0, 0.0},
+		.SensorsStrValues = {"0", "0", "0", "0", "0", "0", "0", "0", "0"},
+		.IMUStrValues = {"1", "0", "0", "0", "0", "0", "0", "0", "0", "0"}};
 
 //----------------------------------------
 // Lock function used by I2C transaction
@@ -157,9 +157,9 @@ static char** IMUDataAccessor(void)
 	ftoa(IMU.yaw, 	IMU.IMUStrPtrs[4], 4);
 	ftoa(IMU.pitch, IMU.IMUStrPtrs[5], 4);
 	ftoa(IMU.roll, 	IMU.IMUStrPtrs[6], 4);
-//	ftoa(IMU.pos[0],IMU.IMUStrPtrs[7], 3);
-//	ftoa(IMU.pos[1],IMU.IMUStrPtrs[8], 3);
-//	ftoa(IMU.pos[2],IMU.IMUStrPtrs[9], 3);
+	//	ftoa(IMU.pos[0],IMU.IMUStrPtrs[7], 3);
+	//	ftoa(IMU.pos[1],IMU.IMUStrPtrs[8], 3);
+	//	ftoa(IMU.pos[2],IMU.IMUStrPtrs[9], 3);
 
 	return (char**)IMU.IMUStrPtrs;
 }
@@ -233,6 +233,10 @@ void IMUProcessingTask(void)
 	// Quaternion
 	float q0, q1, q2, q3;
 
+	// PID Task status structure
+	Task_Stat PIDTaskStat;
+	bool PIDTaskTerminated = false;
+
 	// Configure and calibrates sensors
 	ConfigureSensors();
 	Log_info0("Inertial Measurement Unit initialized.");
@@ -254,13 +258,13 @@ void IMUProcessingTask(void)
 	for(i = 0; i < 10; ++i)
 		IMU.IMUStrPtrs[i] = &IMU.IMUStrValues[i][0];
 
-	// Suscribe a bluetooth datasource to send periodically Sensors's data
-	JSONDataSource* Sensors_ds = SuscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
-																					"gx", "gy", "gz",
-																					"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically Sensors's data
+	JSONDataSource* Sensors_ds = SubscribePeriodicJSONDataSource("sensors", (const char*[]) {	"ax", "ay", "az",
+		"gx", "gy", "gz",
+		"mx", "my", "mz" }, 9, 20, SensorsDataAccessor);
 
-	// Suscribe a bluetooth datasource to send periodically IMU's data
-	JSONDataSource* IMU_ds = SuscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll"}, 7, 20, IMUDataAccessor);//, "px", "py", "pz"}, 10, 20, IMUDataAccessor);
+	// Subscribe a bluetooth datasource to send periodically IMU's data
+	JSONDataSource* IMU_ds = SubscribePeriodicJSONDataSource("IMU", (const char*[]){ "q0", "q1", "q2", "q3", "yaw", "pitch", "roll"}, 7, 20, IMUDataAccessor);//, "px", "py", "pz"}, 10, 20, IMUDataAccessor);
 
 	if(Sensors_ds == NULL || IMU_ds == NULL)
 	{
@@ -359,7 +363,7 @@ void IMUProcessingTask(void)
 				}
 				else
 				{
-		//			Log_error0("Wrong magnetometer values.");
+					//			Log_error0("Wrong magnetometer values.");
 
 					// Auxiliary simplified algorithm-specific variables to avoid repeated arithmetic
 					_4q0 = 4.0f * q0;
@@ -409,17 +413,23 @@ void IMUProcessingTask(void)
 			IMU.pitch 	= 	asin(2*(q0*q2 - q3*q1));
 			IMU.roll 	=	atan2(2*(q0*q1 + q2*q3), 1 - 2*(pow(q1,2) + pow(q2,2)));
 
-		    // Return the quaternion values.
+			// Return the quaternion values.
 			IMU.q[0] = q0;
 			IMU.q[1] = q1;
 			IMU.q[2] = q2;
 			IMU.q[3] = q3;
 
-			// Unblock PID
-			Semaphore_post(PID_Sem);
+			// Unblock PID if PID task is still here
+			if(!PIDTaskTerminated)
+			{
+				Task_stat(PID_Task, &PIDTaskStat);
+				if(PIDTaskStat.mode != ti_sysbios_knl_Task_Mode_TERMINATED)
+					Semaphore_post(PID_Sem);
+				else
+					PIDTaskTerminated = true;
+			}
 		}
 	}
-
 }
 
 //----------------------------------------------------------------------------
@@ -430,10 +440,10 @@ void IMUProcessingTask(void)
 //----------------------------------------------------------------------------
 static const float AccelFactors[] =
 {
-	5.9855042e-4f,	// Range = +/- 2 g (16384 lsb/g)
-	1.1971008e-3f,	// Range = +/- 4 g (8192 lsb/g)
-	2.3942017e-3f,	// Range = +/- 8 g (4096 lsb/g)
-	4.7884033e-3f	// Range = +/- 16 g (2048 lsb/g)
+		5.9855042e-4f,	// Range = +/- 2 g (16384 lsb/g)
+		1.1971008e-3f,	// Range = +/- 4 g (8192 lsb/g)
+		2.3942017e-3f,	// Range = +/- 8 g (4096 lsb/g)
+		4.7884033e-3f	// Range = +/- 16 g (2048 lsb/g)
 };
 
 //----------------------------------------------------------------------------
@@ -445,10 +455,10 @@ static const float AccelFactors[] =
 //----------------------------------------------------------------------------
 static const float GyroFactors[] =
 {
-    1.3323124e-4f,   // Range = +/- 250 dps  (131.0 LSBs/DPS)
-    2.6646248e-4f,   // Range = +/- 500 dps  (65.5 LSBs/DPS)
-    5.3211258e-4f,   // Range = +/- 1000 dps (32.8 LSBs/DPS)
-    0.0010642252f    // Range = +/- 2000 dps (16.4 LSBs/DPS)
+		1.3323124e-4f,   // Range = +/- 250 dps  (131.0 LSBs/DPS)
+		2.6646248e-4f,   // Range = +/- 500 dps  (65.5 LSBs/DPS)
+		5.3211258e-4f,   // Range = +/- 1000 dps (32.8 LSBs/DPS)
+		0.0010642252f    // Range = +/- 2000 dps (16.4 LSBs/DPS)
 };
 
 //----------------------------------------------------------------------------
@@ -457,14 +467,14 @@ static const float GyroFactors[] =
 //----------------------------------------------------------------------------
 static const float MagnFactors[] =
 {
-    7.2992701e-4f,   // Range = +/- 0.88 Gauss (1370 LSB/Gauss)
-    9.1743119e-4f,   // Range = +/- 1.30 Gauss (1090 LSB/Gauss)
-    0.0012195121f,   // Range = +/- 1.90 Gauss (820 LSB/Gauss)
-    0.0015151515f,   // Range = +/- 2.50 Gauss (660 LSB/Gauss)
-    0.0022727273f,   // Range = +/- 4.00 Gauss (440 LSB/Gauss)
-    0.0025641026f,   // Range = +/- 4.70 Gauss (390 LSB/Gauss)
-    0.0030303030f,   // Range = +/- 5.60 Gauss (330 LSB/Gauss)
-    0.0043478261f    // Range = +/- 8.10 Gauss (230 LSB/Gauss)
+		7.2992701e-4f,   // Range = +/- 0.88 Gauss (1370 LSB/Gauss)
+		9.1743119e-4f,   // Range = +/- 1.30 Gauss (1090 LSB/Gauss)
+		0.0012195121f,   // Range = +/- 1.90 Gauss (820 LSB/Gauss)
+		0.0015151515f,   // Range = +/- 2.50 Gauss (660 LSB/Gauss)
+		0.0022727273f,   // Range = +/- 4.00 Gauss (440 LSB/Gauss)
+		0.0025641026f,   // Range = +/- 4.70 Gauss (390 LSB/Gauss)
+		0.0030303030f,   // Range = +/- 5.60 Gauss (330 LSB/Gauss)
+		0.0043478261f    // Range = +/- 8.10 Gauss (230 LSB/Gauss)
 };
 
 //------------------------------------------
@@ -499,13 +509,20 @@ static void ConvertRawData(void)
 //------------------------------------------
 static void TransactionCallback(uint32_t status, uint8_t* buffer, uint32_t length)
 {
-	if(CheckI2CErrorCode(status, false))
+	static bool IMUProcessingTaskTerminated = false;
+
+	if(CheckI2CErrorCode(status, false) && !IMUProcessingTaskTerminated)
 	{
 		// Raw data is now available in 'IMU.MPU6050RawData' but we have to convert it to meaningfull values before letting 'IMU_Task' process this data.
 		ConvertRawData();
 
-		// Unblock 'IMU_Task'
-		Semaphore_post(IMUProcessing_Sem);
+		// Unblock 'IMUProcessing_Task' if this task isn't terminated
+		Task_Stat IMUProcessingTaskStat;
+		Task_stat(IMUProcessing_Task, &IMUProcessingTaskStat);
+		if(IMUProcessingTaskStat.mode != ti_sysbios_knl_Task_Mode_TERMINATED)
+			Semaphore_post(IMUProcessing_Sem);
+		else
+			IMUProcessingTaskTerminated = true;
 	}
 }
 
@@ -547,7 +564,7 @@ static void ConfigureSensors(void)
 	// Buffer used for reading and writing MPU6050 and HMC5883L configuration I2C registers
 	uint8_t buffer[3];
 
-    Task_sleep(200); // 500ms
+	Task_sleep(200); // 500ms
 
 	// Configure magnetometer to 75Hz sample rate, no averaged sample, 1090LSb/Gauss gain
 	buffer[0] = HMC5883L_MEASUREMENT_FLOW_NORMAL | HMC5883L_SAMPLE_RATE_75HZ | HMC5883L_SAMPLE_AVERAGE_1;
@@ -560,18 +577,18 @@ static void ConfigureSensors(void)
 	Log_info0("HMC5883L initialized.");
 
 	// Perform MPU6050 device reset
-    buffer[0] = MPU6050_PWR_MGMT_1_DEVICE_RESET;
-    Async_I2CRegWrite(IMU_I2C_BASE, MPU6050_I2C_ADDR, MPU6050_O_PWR_MGMT_1, buffer, 1, NULL);
-    CheckI2CErrorCode(WaitI2CTransacs(0), true);
+	buffer[0] = MPU6050_PWR_MGMT_1_DEVICE_RESET;
+	Async_I2CRegWrite(IMU_I2C_BASE, MPU6050_I2C_ADDR, MPU6050_O_PWR_MGMT_1, buffer, 1, NULL);
+	CheckI2CErrorCode(WaitI2CTransacs(0), true);
 
-    Task_sleep(200); // Wait 500ms for MPU6050 to reset its registers
+	Task_sleep(200); // Wait 500ms for MPU6050 to reset its registers
 
 	// Wake-up MPU6050 and set gyroscope Y axis PPL as clock source (improved stability)
-    buffer[0] = MPU6050_PWR_MGMT_1_CLKSEL_YG;
-    Async_I2CRegReadModifyWrite(IMU_I2C_BASE, MPU6050_I2C_ADDR, MPU6050_O_PWR_MGMT_1, buffer, ~MPU6050_PWR_MGMT_1_SLEEP & ~MPU6050_PWR_MGMT_1_CLKSEL_M, NULL);
-    CheckI2CErrorCode(WaitI2CTransacs(0), true);
+	buffer[0] = MPU6050_PWR_MGMT_1_CLKSEL_YG;
+	Async_I2CRegReadModifyWrite(IMU_I2C_BASE, MPU6050_I2C_ADDR, MPU6050_O_PWR_MGMT_1, buffer, ~MPU6050_PWR_MGMT_1_SLEEP & ~MPU6050_PWR_MGMT_1_CLKSEL_M, NULL);
+	CheckI2CErrorCode(WaitI2CTransacs(0), true);
 
-    Task_sleep(200); // Wait 500ms for MPU6050 to wake up
+	Task_sleep(200); // Wait 500ms for MPU6050 to wake up
 
 	// Configure the MPU6050 for +/- 4 g accelerometer range.
 	buffer[0] = MPU6050_ACCEL_CONFIG_AFS_SEL_4G;

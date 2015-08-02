@@ -851,7 +851,6 @@ void UARTvprintf(UARTConsole* console, const char *pcString, va_list vaArgP)
 				for(ui32Idx = 0; pcStr[ui32Idx] != '\0'; ui32Idx++) { }
 
 				// Write the string.
-
 				UARTwrite(console, pcStr, ui32Idx);
 
 				// Write any required padding spaces

@@ -56,6 +56,8 @@ typedef struct
 	bool enabled;
 	// Period of the data source data sending in RTOS clock ticks (0 means not periodic)
 	uint32_t period;
+	// If the datasource is periodic, this handle keep track of the datasource clock.
+	Clock_Handle clock;
 	DataValuesGetAccessor dataAccessor;
 	// Flag used to indicate to sending task that this data source need to send its data
 	bool sendNowFlag;
@@ -89,29 +91,38 @@ void JSON_start_cmd(int argc, char *argv[]);
 void JSON_enable_programatic_access_cmd(int argc, char *argv[]);
 void JSON_disable_programatic_access_cmd(int argc, char *argv[]);
 
-//--------------------------------------------
-// Suscribe data source:
-// Creates a data source and add it to dynamic
-// 'dataSources' array.
+//---------------------------------------------
+// Subscribe data source:
+// Creates a data source and get it from static
+// 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
-//--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(const char* name,const char* keys[], uint32_t dataCount);
-JSONDataSource* SuscribeJSONDataSource2(const char* name,const char* keys[], uint32_t dataCount, bool enabled);
+//---------------------------------------------
+JSONDataSource* SubscribeJSONDataSource(const char* name,const char* keys[], uint32_t dataCount);
+JSONDataSource* SubscribeJSONDataSource2(const char* name,const char* keys[], uint32_t dataCount, bool enabled);
+
 
 //--------------------------------------------
-// Suscribe periodic data source:
-// Creates a periodic data source and add it
-// to dynamic 'dataSources' array.
+// Subscribe periodic data source:
+// Creates a periodic data source and get it
+// from static 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
-JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled);
+JSONDataSource* SubscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor DataAccessor);
+JSONDataSource* SubscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled);
+
+//--------------------------------------------
+// Unsubscribe JSON data source:
+// Unsubscribes given data source.
+// Return false if the given datasource wasn't
+// subscribed, returns true otherwise.
+//--------------------------------------------
+bool UnsubscribeJSONDataSource(JSONDataSource* datasource);
 
 //--------------------------------------------
 // Send data:
@@ -145,5 +156,13 @@ void PeriodicJSONDataSendingSwi(UArg dataSource);
 // data is received.
 //--------------------------------------------
 JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t dataCount, DataValuesSetAccessor dataAccessor);
+
+//--------------------------------------------
+// Unsubscribe JSON data input:
+// Unsubscribes given data input.
+// Returns false if the given data input wasn't
+// subscribed, returns true otherwise.
+//--------------------------------------------
+bool UnsubscribeJSONDataInput(JSONDataInput* datainput);
 
 #endif /* JSON_COMMUNICATION_H_ */

@@ -46,7 +46,18 @@ static struct
 {
 	JSONDataSource array[MAX_DATASOURCE_COUNT];
 	uint32_t used;
-} JSONDataSources = {.used = 0};
+	bool IsJSONDatasourcesArrayInitialized;
+	const uint32_t capacity;
+} JSONDataSources = {.used = 0, .IsJSONDatasourcesArrayInitialized = false, .capacity = MAX_DATASOURCE_COUNT};
+
+static void InitializeJSONDataSourcesArray()
+{
+	if(!JSONDataSources.IsJSONDatasourcesArrayInitialized)
+	{
+		memset(JSONDataSources.array, NULL, JSONDataSources.capacity*sizeof(JSONDataSource));
+		JSONDataSources.IsJSONDatasourcesArrayInitialized = true;
+	}
+}
 
 //----------------------------------------
 // Private static JSON data inputs array
@@ -55,8 +66,24 @@ static struct
 {
 	JSONDataInput array[MAX_DATAINPUT_COUNT];
 	uint32_t used;
-} JSONDataInputs = {.used = 0};
+	bool IsJSONDatainputsArrayInitialized;
+	const uint32_t capacity;
+} JSONDataInputs = {.used = 0, .IsJSONDatainputsArrayInitialized = false, .capacity = MAX_DATAINPUT_COUNT};
 
+static void InitializeJSONDataInputsArray()
+{
+	if(!JSONDataInputs.IsJSONDatainputsArrayInitialized)
+	{
+		memset(JSONDataInputs.array, NULL, JSONDataInputs.capacity*sizeof(JSONDataInput));
+		JSONDataInputs.IsJSONDatainputsArrayInitialized = true;
+	}
+}
+
+//----------------------------------------
+// Raw echo data source:
+// Simple data source which sends back
+// all received JSON objects.
+//----------------------------------------
 static JSONDataSource* rawEcho_ds;
 
 //----------------------------------------
@@ -70,10 +97,11 @@ void JSON_list_sources_cmd(int argc, char *argv[])
 		UARTwrite(&Console, "AVAILABLE JSON DATA SOURCES:", 28);
 
 		uint32_t i;
-		for(i = 0; i < JSONDataSources.used; ++i)
+		for(i = 0; i < JSONDataSources.capacity; ++i)
 		{
 			JSONDataSource* ds = &JSONDataSources.array[i];
-			UARTprintf(&Console, "\n - %s		%s %s", ds->name, ds->enabled ? "Enabled" : "Disabled", ds->period > 0 ? "(Periodic)" : "");
+			if(ds->name != NULL)
+				UARTprintf(&Console, "\n - %s		%s %s", ds->name, ds->enabled ? "Enabled" : "Disabled", ds->period > 0 ? "(Periodic)" : "");
 		}
 	}
 }
@@ -88,15 +116,17 @@ void JSON_enable_cmd(int argc, char *argv[])
 	{
 		while(--argc)
 		{
-			int32_t ds_idx = JSONDataSources.used;
+			int32_t ds_idx = JSONDataSources.capacity;
 			while(ds_idx--)
 			{
-				if(strcmp(JSONDataSources.array[ds_idx].name, argv[argc]) == 0)
-				{
-					JSONDataSources.array[ds_idx].enabled = true;
-					UARTprintf(&Console, "'%s' JSON data source enabled.\n", argv[argc]);
-					break;
-				}
+				JSONDataSource ds = JSONDataSources.array[ds_idx];
+				if(ds.name != NULL)
+					if(strcmp(ds.name, argv[argc]) == 0)
+					{
+						ds.enabled = true;
+						UARTprintf(&Console, "'%s' JSON data source enabled.\n", argv[argc]);
+						break;
+					}
 			}
 
 			if(ds_idx < 0)
@@ -118,12 +148,13 @@ void JSON_disable_cmd(int argc, char *argv[])
 	{
 		while(--argc)
 		{
-			int32_t ds_idx = JSONDataSources.used;
+			int32_t ds_idx = JSONDataSources.capacity;
 			while(ds_idx--)
 			{
-				if(strcmp(JSONDataSources.array[ds_idx].name, argv[argc]) == 0)
+				JSONDataSource ds = JSONDataSources.array[ds_idx];
+				if(strcmp(ds.name, argv[argc]) == 0)
 				{
-					JSONDataSources.array[ds_idx].enabled = false;
+					ds.enabled = false;
 					UARTprintf(&Console, "'%s' JSON data source disabled.\n", argv[argc]);
 					break;
 				}
@@ -195,7 +226,7 @@ static void NewJSONObjectReceived(char c)
 	JSONDataInput* di;
 	const char* key;
 
-//TODO : lock
+	//TODO : lock
 	memset(buf, 0, INPUT_JSON_BUFFER_SIZE);
 	memset(data, 0, 32*MAX_DATA_COUNT);
 
@@ -203,79 +234,87 @@ static void NewJSONObjectReceived(char c)
 
 	if(rawEcho_ds != NULL)
 		if(rawEcho_ds->enabled)
-			SendJSONData(rawEcho_ds, &buf);
+			SendJSONData(rawEcho_ds, (char**)(&buf));
 
 	jsmn_init(&parser);
 	tokNum = jsmn_parse(&parser, buf, INPUT_JSON_BUFFER_SIZE, tokens, INPUT_JSON_TOKEN_NUM);
 
-	for(i = 0; i < JSONDataInputs.used; i++)
+	for(i = 0; i < JSONDataInputs.capacity; i++)
 	{
 		di = &JSONDataInputs.array[i];
 
-		if(tokNum != di->dataCount*2+1)
-			continue;
-
-		for(j = 0; j < di->dataCount; j++)
+		if(di->name != NULL)
 		{
-			tok = &tokens[1+2*j];
-			key = di->keys[j];
-			if(!strncmp(buf + tok->start, key, tok->end - tok->start))
+			if(tokNum != di->dataCount*2+1)
+				continue;
+
+			for(j = 0; j < di->dataCount; j++)
 			{
-				tok = &tokens[2+2*j];
+				tok = &tokens[1+2*j];
+				key = di->keys[j];
+				if(!strncmp(buf + tok->start, key, tok->end - tok->start))
+				{
+					tok = &tokens[2+2*j];
 
-				if(tok->end - tok->start > 32)
-					return;
+					if(tok->end - tok->start > 32)
+						return;
 
-				strncpy(data[j], buf + tok->start, tok->end - tok->start);
+					strncpy(data[j], buf + tok->start, tok->end - tok->start);
 					dataPtrs[j] = data[j];
+				}
+				else
+					break;
 			}
-			else
-				break;
-		}
 
-		if(j == di->dataCount)
-		{
-			di->dataAccessor((char**)dataPtrs);
-			return;
+			if(j == di->dataCount)
+			{
+				di->dataAccessor((char**)dataPtrs);
+				return;
+			}
 		}
 	}
 }
 
-//--------------------------------------------
-// Suscribe data source:
-// Creates a data source and add it to dynamic
+//---------------------------------------------
+// Subscribe data source:
+// Creates a data source and get it from static
 // 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
-//--------------------------------------------
-JSONDataSource* SuscribeJSONDataSource(const char* name, const char* keys[], uint32_t dataCount)
+//---------------------------------------------
+JSONDataSource* SubscribeJSONDataSource(const char* name, const char* keys[], uint32_t dataCount)
 {
-	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, true);
+	return SubscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, true);
 }
 
-JSONDataSource* SuscribeJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, bool enabled)
+JSONDataSource* SubscribeJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, bool enabled)
 {
-	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, enabled);
+	return SubscribePeriodicJSONDataSource2(name, keys, dataCount, 0, NULL, enabled);
 }
 
 //--------------------------------------------
-// Suscribe periodic data source:
-// Creates a periodic data source and add it
-// to dynamic 'JSONDataSources' array.
+// Subscribe periodic data source:
+// Creates a periodic data source and get it
+// from static 'JSONDataSources' array.
 // The 'keys' array should contain 'DataCount'
 // names of the data fields provided by the
 // datasource.
 // 'period' is the period of sending in RTOS
 // clock ticks.
 //--------------------------------------------
-JSONDataSource* SuscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
+JSONDataSource* SubscribePeriodicJSONDataSource(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor)
 {
-	return SuscribePeriodicJSONDataSource2(name, keys, dataCount, period, dataAccessor, true);
+	return SubscribePeriodicJSONDataSource2(name, keys, dataCount, period, dataAccessor, true);
 }
 
-JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled)
+JSONDataSource* SubscribePeriodicJSONDataSource2(const char* name, const char* keys[], uint32_t dataCount, uint32_t period, DataValuesGetAccessor dataAccessor, bool enabled)
 {
+	if(!JSONDataSources.IsJSONDatasourcesArrayInitialized)
+		InitializeJSONDataSourcesArray();
+	if(!JSONDataInputs.IsJSONDatainputsArrayInitialized)
+		InitializeJSONDataInputsArray();
+
 	if(dataCount > MAX_DATA_COUNT)
 	{
 		Log_error1("Error: Too much data fields given to create a new datasource (please modify MAX_DATA_COUNT=%u if needed).", MAX_DATA_COUNT);
@@ -283,14 +322,25 @@ JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* ke
 		return NULL;
 	}
 
-	if (JSONDataSources.used == MAX_DATASOURCE_COUNT)
+	if (JSONDataSources.used >= JSONDataSources.capacity)
 	{
 		Log_error1("Error: Maximum JSON datasources count reached (please modify MAX_DATASOURCE_COUNT=%u if needed).", MAX_DATASOURCE_COUNT);
 		ASSERT(FALSE);
 		return NULL;
 	}
 
-	JSONDataSource* newSource = &JSONDataSources.array[JSONDataSources.used++];
+	// Find a free instance of JSONDataSource structure
+	uint32_t idx = 0;
+	if(JSONDataSources.used++ != 0)
+		while(JSONDataSources.array[idx].name != NULL)
+			if(idx++ > JSONDataSources.capacity)
+			{
+				Log_error1("Error: JSON datasources counter or datasources array corrrupted (MAX_DATASOURCE_COUNT=%u).", MAX_DATASOURCE_COUNT);
+				ASSERT(FALSE);
+				return NULL;
+			}
+	JSONDataSource* newSource = &JSONDataSources.array[idx];
+
 	newSource->name = name;
 	newSource->keys = keys;
 	newSource->dataCount = dataCount;
@@ -308,15 +358,63 @@ JSONDataSource* SuscribePeriodicJSONDataSource2(const char* name, const char* ke
 		clockParams.period = period;
 		clockParams.startFlag = true;
 		clockParams.arg = (UArg)newSource;
-		if(Clock_create(PeriodicJSONDataSendingSwi, period, &clockParams, &eb) == NULL)
+		newSource->clock = Clock_create(PeriodicJSONDataSendingSwi, period, &clockParams, &eb);
+		if(newSource->clock == NULL)
 		{
-			JSONDataSources.used--;
+			UnsubscribeJSONDataSource(newSource);
 			Log_error0("Error: Periodic data source clock creation failed.");
 			return NULL;
 		}
 	}
+	else
+		newSource->clock = NULL;
 
 	return newSource;
+}
+
+//---------------------------------------------
+// Unsubscribe JSON data source:
+// Unsubscribes given data source.
+// Returns false if the given datasource wasn't
+// subscribed, returns true otherwise.
+//---------------------------------------------
+bool UnsubscribeJSONDataSource(JSONDataSource* datasource)
+{
+	if(!JSONDataSources.IsJSONDatasourcesArrayInitialized)
+		InitializeJSONDataSourcesArray();
+	if(!JSONDataInputs.IsJSONDatainputsArrayInitialized)
+		InitializeJSONDataInputsArray();
+
+	if(datasource != NULL)
+	{
+		// Find specified datasource in JSON datasources array
+		uint32_t idx = 0;
+		while(&JSONDataSources.array[idx] != datasource)
+			if(idx++ > JSONDataSources.capacity)
+			{
+				Log_warning0("Didn't found specified datasource during datasource unsubscription.");
+				return false;
+			}
+
+		if(datasource->period > 0)
+		{
+			if(datasource->clock == NULL)
+				Log_error0("Error: Periodic datasource corruption detected while unsubcribing it (period greater than 0 but NULL clock handle).");
+			else
+			{
+				Clock_stop(datasource->clock);
+				Clock_delete(&(datasource->clock));
+			}
+		}
+
+		memset(datasource, NULL, sizeof(JSONDataSource));
+
+		JSONDataSources.used--;
+
+		return true;
+	}
+
+	return false;
 }
 
 //--------------------------------------------
@@ -339,53 +437,54 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 		return false;
 	}
 
-	if(JSONDataSources.used > 0)
-	{
-		uint32_t dsIdx;
-		uint32_t valIdx;
-
-		for(dsIdx = 0; dsIdx < JSONDataSources.used; ++dsIdx)
+	if(JSONDataSources.used > 0 && ds != NULL)
+		if(ds->name != NULL)
 		{
-			if(ds == &JSONDataSources.array[dsIdx])
+			uint32_t dsIdx;
+			uint32_t valIdx;
+
+			for(dsIdx = 0; dsIdx < JSONDataSources.capacity; ++dsIdx)
 			{
-				if(ds->enabled)
+				if(ds == &JSONDataSources.array[dsIdx])
 				{
-					UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
-
-					for(valIdx = 0; valIdx < ds->dataCount; ++valIdx)
+					if(ds->enabled)
 					{
-						char* value = values[valIdx];
-						const char* key = ds->keys[valIdx];
+						UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
 
-						if(value == NULL || key == NULL) {
-							Log_error0("Error: JSON datasource provided wrong values or keys.");
-							return false;
+						for(valIdx = 0; valIdx < ds->dataCount; ++valIdx)
+						{
+							char* value = values[valIdx];
+							const char* key = ds->keys[valIdx];
+
+							if(value == NULL || key == NULL) {
+								Log_error0("Error: JSON datasource provided wrong values or keys.");
+								return false;
+							}
+
+							// Don't append comma if we are printing the last element
+							const char* comma = valIdx == ds->dataCount-1 ? "" : ",";
+
+							UARTprintf(&Console, JSONProgrammaticAccessMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
 						}
 
-						// Don't append comma if we are printing the last element
-						const char* comma = valIdx == ds->dataCount-1 ? "" : ",";
+						UARTwrite(&Console, JSONProgrammaticAccessMode ? " }" : "\n}", 2);
 
-						UARTprintf(&Console, JSONProgrammaticAccessMode ? " \"%s\": \"%s\"%s " : "\t\"%s\": \"%s\"%s \n", key, value, comma);
+						// If Tx UART console buffer is near to be full, we wait for UART transmition
+						// TODO: trouver mieux !
+						uint32_t timeout = 10;
+						if(UARTTxBytesFree(&Console) < 128)
+							while(UARTTxBytesFree(&Console) < 1024 && --timeout)
+								Task_sleep(1);
+
+						return true;
 					}
-
-					UARTwrite(&Console, JSONProgrammaticAccessMode ? " }" : "\n}", 2);
-
-					// If Tx UART console buffer is near to be full, we wait for UART transmition
-					// TODO: trouver mieux !
-					uint32_t timeout = 10;
-					if(UARTTxBytesFree(&Console) < 128)
-						while(UARTTxBytesFree(&Console) < 1024 && --timeout)
-							Task_sleep(1);
-
-					return true;
+					Log_warning0("Tried to send disabled JSON datasource.");
+					return false;
 				}
-				// Datasource disabled (not an error)
-				return false;
 			}
+			Log_error0("Error: Invalid JSON datasource.");
+			return false;
 		}
-		Log_error0("Error: Invalid JSON datasource.");
-		return false;
-	}
 
 	Log_error0("Error: there isn't any subscribed JSON datasource.");
 	return false;
@@ -413,7 +512,7 @@ void PeriodicJSONDataSendingTask(void)
 	}
 
 	// Subscribe raw echo from data inputs JSON datasource
-	rawEcho_ds = SuscribeJSONDataSource2("rawEcho", (const char*[]) { "rawInput" }, 2, false);
+	rawEcho_ds = SubscribeJSONDataSource2("rawEcho", (const char*[]) { "rawInput" }, 2, false);
 
 	while(1)
 	{
@@ -425,10 +524,10 @@ void PeriodicJSONDataSendingTask(void)
 			uint32_t valIdx;
 
 			// Send data from JSON datasources accessors if they are enabled and if their sendNowFlag is raised
-			for(dsIdx = 0; dsIdx < JSONDataSources.used; ++dsIdx)
+			for(dsIdx = 0; dsIdx < JSONDataSources.capacity; ++dsIdx)
 			{
 				JSONDataSource* ds = &JSONDataSources.array[dsIdx];
-				if(ds->sendNowFlag && ds->enabled)
+				if(ds->sendNowFlag && ds->enabled && ds->name != NULL)
 				{
 					UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
 
@@ -482,12 +581,34 @@ void PeriodicJSONDataSendingSwi(UArg dataSource)
 		return;
 	}
 
+	// Verify wether if JSON periodic sending task terminated
+	Task_Stat PeriodicJSONTaskStat;
+	Task_stat(PeriodicJSONDataSending_Task, &PeriodicJSONTaskStat);
+	if(PeriodicJSONTaskStat.mode == ti_sysbios_knl_Task_Mode_TERMINATED)
+	{
+		Log_error0("Error: JSON periodic sending task terminated unexpectedly.");
+
+		// Unsubscribe all data sources
+		uint32_t dsIdx;
+		for(dsIdx = 0; dsIdx < JSONDataSources.capacity; ++dsIdx)
+		{
+			JSONDataSource* ds = &JSONDataSources.array[dsIdx];
+			if(ds->name != NULL)
+				UnsubscribeJSONDataSource(ds);
+		}
+
+		JSONCommunicationStarted = false;
+		EnableCmdLineInterface(&Console);
+		return;
+	}
+
 	JSONDataSource* ds = (JSONDataSource*)dataSource;
 	if(ds != NULL && JSONCommunicationStarted)
 	{
-		if(ds->dataAccessor != NULL)
+		if(ds->dataAccessor != NULL && ds->name != NULL)
 		{
 			ds->sendNowFlag = true;
+
 			Semaphore_post(PeriodicJSON_Sem);
 		}
 	}
@@ -504,6 +625,11 @@ void PeriodicJSONDataSendingSwi(UArg dataSource)
 //--------------------------------------------
 JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t dataCount, DataValuesSetAccessor dataAccessor)
 {
+	if(!JSONDataSources.IsJSONDatasourcesArrayInitialized)
+		InitializeJSONDataSourcesArray();
+	if(!JSONDataInputs.IsJSONDatainputsArrayInitialized)
+		InitializeJSONDataInputsArray();
+
 	if(dataCount > MAX_DATA_COUNT)
 	{
 		Log_error1("Error: Too much data fields given to create a new datainput (please modify MAX_DATA_COUNT=%u if needed).", MAX_DATA_COUNT);
@@ -511,14 +637,25 @@ JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t d
 		return NULL;
 	}
 
-	if (JSONDataInputs.used == MAX_DATAINPUT_COUNT)
+	if (JSONDataInputs.used == JSONDataInputs.capacity)
 	{
 		Log_error1("Error: Maximum JSON datainputs count reached (please modify MAX_DATAINPUT_COUNT=%u if needed).", MAX_DATAINPUT_COUNT);
 		ASSERT(false);
 		return NULL;
 	}
 
-	JSONDataInput* newInput = &JSONDataInputs.array[JSONDataInputs.used++];
+	// Find a free instance of JSONDataInput structure
+	uint32_t idx = 0;
+	if(JSONDataInputs.used++ != 0)
+		while(JSONDataInputs.array[idx].name != NULL)
+			if(idx++ > JSONDataInputs.capacity)
+			{
+				Log_error1("Error: JSON datainputs counter or datainputs array corrrupted (MAX_DATAINPUT_COUNT=%u).", MAX_DATAINPUT_COUNT);
+				ASSERT(FALSE);
+				return NULL;
+			}
+	JSONDataInput* newInput = &JSONDataInputs.array[idx];
+
 	newInput->name = name;
 	newInput->keys = keys;
 	newInput->dataCount = dataCount;
@@ -527,3 +664,33 @@ JSONDataInput* SubscribeJSONDataInput(char* name, const char* keys[], uint32_t d
 	return newInput;
 }
 
+//--------------------------------------------
+// Unsubscribe JSON data input:
+// Unsubscribes given data input.
+// Returns false if the given data input wasn't
+// subscribed, returns true otherwise.
+//--------------------------------------------
+bool UnsubscribeJSONDataInput(JSONDataInput* datainput)
+{
+	if(!JSONDataSources.IsJSONDatasourcesArrayInitialized)
+		InitializeJSONDataSourcesArray();
+	if(!JSONDataInputs.IsJSONDatainputsArrayInitialized)
+		InitializeJSONDataInputsArray();
+
+	if(datainput != NULL)
+	{
+		// Find specified datasource in JSON datasources array
+		uint32_t idx = 0;
+		while(&JSONDataInputs.array[idx] != datainput)
+			if(idx++ > JSONDataInputs.capacity)
+				return false;
+
+		memset(datainput, NULL, sizeof(JSONDataInput));
+
+		JSONDataInputs.used--;
+
+		return true;
+	}
+
+	return false;
+}
