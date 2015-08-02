@@ -142,11 +142,11 @@ void JSON_enable_cmd(int argc, char *argv[])
 			int32_t ds_idx = JSONDataSources.capacity;
 			while(ds_idx--)
 			{
-				JSONDataSource ds = JSONDataSources.array[ds_idx];
-				if(ds.name != NULL)
-					if(strcmp(ds.name, argv[argc]) == 0)
+				JSONDataSource* ds = &JSONDataSources.array[ds_idx];
+				if(ds->name != NULL)
+					if(strcmp(ds->name, argv[argc]) == 0)
 					{
-						ds.enabled = true;
+						ds->enabled = true;
 						UARTprintf(&Console, "'%s' JSON data source enabled.\n", argv[argc]);
 						break;
 					}
@@ -174,13 +174,14 @@ void JSON_disable_cmd(int argc, char *argv[])
 			int32_t ds_idx = JSONDataSources.capacity;
 			while(ds_idx--)
 			{
-				JSONDataSource ds = JSONDataSources.array[ds_idx];
-				if(strcmp(ds.name, argv[argc]) == 0)
-				{
-					ds.enabled = false;
-					UARTprintf(&Console, "'%s' JSON data source disabled.\n", argv[argc]);
-					break;
-				}
+				JSONDataSource* ds = &JSONDataSources.array[ds_idx];
+				if(ds->name != NULL)
+					if(strcmp(ds->name, argv[argc]) == 0)
+					{
+						ds->enabled = false;
+						UARTprintf(&Console, "'%s' JSON data source disabled.\n", argv[argc]);
+						break;
+					}
 			}
 
 			if(ds_idx < 0)
@@ -394,7 +395,8 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 	}
 
 	if(JSONDataSources.used > 0 && ds != NULL)
-		if(ds->name != NULL)
+	{
+		if(ds->name != NULL && ds->enabled)
 		{
 			uint32_t dsIdx;
 			uint32_t valIdx;
@@ -403,8 +405,6 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 			{
 				if(ds == &JSONDataSources.array[dsIdx])
 				{
-					if(ds->enabled)
-					{
 						UARTwrite(&Console, JSONProgrammaticAccessMode ? "\n{ " : "\n{\n", 3);
 
 						for(valIdx = 0; valIdx < ds->dataCount; ++valIdx)
@@ -433,15 +433,14 @@ bool SendJSONData(JSONDataSource* ds, char* values[])
 								Task_sleep(1);
 
 						return true;
-					}
-					Log_warning0("Tried to send disabled JSON datasource.");
-					return false;
 				}
 			}
-			Log_error0("Error: Invalid JSON datasource.");
+			Log_error0("Error: Can't find specified JSON datasource among subscribed datasources.");
 			return false;
 		}
-
+		Log_error0("Error: Specified datasource isn't enabled or doesn't have any name.");
+		return false;
+	}
 	Log_error0("Error: there isn't any subscribed JSON datasource.");
 	return false;
 }
