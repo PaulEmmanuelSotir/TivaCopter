@@ -312,9 +312,9 @@ void PIDTask(void)
 
 		if(TivacopterControl.AltitudeStabilizationEnabled)
 		{
-			AltitudePID.error = IMU.accel->val[z];
+			AltitudePID.error = IMU.accel->val[z] - IMU.accel->g;
 			ProcessPID(&AltitudePID);
-			TivacopterControl.Throttle += AltitudePID.out;
+			TivacopterControl.Throttle -= AltitudePID.out;
 		}
 
 		// Convert euler angles to motors command
