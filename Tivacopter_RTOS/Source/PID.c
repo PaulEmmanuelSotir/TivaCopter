@@ -169,6 +169,8 @@ void RemoteControlDataAccessor(char** RemoteCtrlKeys)
 
 	TivacopterControl.Beep = ('1' == RemoteCtrlKeys[4][0]);
 	beep(TivacopterControl.Beep);
+
+	TivacopterControl.ShutOffMotors =  ('1' == RemoteCtrlKeys[5][0]);
 }
 
 //------------------------------------------
@@ -277,7 +279,7 @@ void PIDTask(void)
 	JSONDataSource* Radio_ds = SubscribePeriodicJSONDataSource("radio", RadioPropertiesNames, 5, 40, RadioDataAccessor);
 
 	// Subscribe a bluetooth datainput to receive remote control data
-	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControl", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep" }, 5, RemoteControlDataAccessor);
+	JSONDataInput* RemoteControl_di = SubscribeJSONDataInput("RemoteControl", (const char*[]) { "throttle", "directionX", "directionY", "yaw", "beep", "shutOffMotors" }, 6, RemoteControlDataAccessor);
 
 	if(PID_ds == NULL || Radio_ds == NULL || RemoteControl_di == NULL)
 	{
