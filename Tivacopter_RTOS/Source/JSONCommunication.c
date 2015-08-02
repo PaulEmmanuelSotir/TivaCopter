@@ -107,6 +107,26 @@ void JSON_list_sources_cmd(int argc, char *argv[])
 }
 
 //----------------------------------------
+// list inputs:
+// List all available JSON data source.
+//----------------------------------------
+void JSON_list_inputs_cmd(int argc, char *argv[])
+{
+	if(checkArgCount(&Console, argc, 1))
+	{
+		UARTwrite(&Console, "AVAILABLE JSON DATA INPUTS:", 27);
+
+		uint32_t i;
+		for(i = 0; i < JSONDataInputs.capacity; ++i)
+		{
+			JSONDataInput* di = &JSONDataInputs.array[i];
+			if(di->name != NULL)
+				UARTprintf(&Console, "\n - %s		(%d properties)", di->name, di->dataCount);
+		}
+	}
+}
+
+//----------------------------------------
 // enable:
 // Enables specified JSON data source.
 //----------------------------------------
@@ -500,6 +520,7 @@ void PeriodicJSONDataSendingTask(void)
 	// Subscribe UART console commands for JSON communication
 	bool sucess = true;
 	sucess = sucess && SubscribeCmd(&Console, "listSources", 	JSON_list_sources_cmd, 	"List all available JSON data sources.");
+	sucess = sucess && SubscribeCmd(&Console, "listInputs", 	JSON_list_inputs_cmd,	"List all available JSON data inputs.");
 	sucess = sucess && SubscribeCmd(&Console, "enable", 		JSON_enable_cmd, 		"Enables specified JSON data source's stream (only active once \'start\' have been called).");
 	sucess = sucess && SubscribeCmd(&Console, "disable", 		JSON_disable_cmd, 		"Disables specified JSON data source's stream.");
 	sucess = sucess && SubscribeListeningCmd(&Console, "start", JSON_start_cmd, 		"Starts JSON communication.", "\n", NewJSONObjectReceived);
