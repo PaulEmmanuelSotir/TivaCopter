@@ -131,6 +131,7 @@ typedef struct
 {
 	float val[3];
 	AccelRange range;
+	float g;
 } Accelerometer;
 
 //----------------------------------------

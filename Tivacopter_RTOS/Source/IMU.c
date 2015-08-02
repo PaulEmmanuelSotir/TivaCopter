@@ -356,7 +356,7 @@ void IMUProcessingTask(void)
 				}
 				else
 				{
-					Log_error0("Wrong magnetometer values.");
+					//Log_error0("Wrong magnetometer values.");
 
 					// Auxiliary simplified algorithm-specific variables to avoid repeated arithmetic
 					_4q0 = 4.0f * q0;
@@ -627,6 +627,14 @@ static void ConfigureSensors(void)
 	Gyro.yOffset = gyro_sum[y] / i;
 	Gyro.zOffset = gyro_sum[z] / i;
 	Log_info0("Gyroscope calibration done.");
+
+	// Gravity measure
+	Log_info0("Measuring gravity acceleration... (do not move device)");
+	float gmean2 = 0;
+	for(i = 0; i < 128; i++)
+		gmean2 += Accel.val[x]*Accel.val[x] + Accel.val[y]*Accel.val[y] + Accel.val[z]*Accel.val[z];
+	Accel.g = __sqrtf(gmean2/i);
+	Log_info0("Gravity acceleration measure done.");
 }
 
 //------------------------------------------
